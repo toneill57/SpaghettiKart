@@ -59,7 +59,7 @@ Flags (all optional):
 |---|---|
 | `--fork-root DIR` | the directory above `tools/` |
 | `--app PATH` | `<fork-root>/build-cmake/SpaghettiKart.app` |
-| `--ship-home DIR` | `$SHIP_HOME`, else `~/Library/Application Support/SpaghettiKart` (the app's own default, `src/port/Game.cpp:1050`) |
+| `--ship-home DIR` | `$SHIP_HOME`, else `~/Library/Application Support/SpaghettiKart` (the app's own default, `src/port/Game.cpp:1050`). `HOME` is read only for this default, so with `--ship-home` (or `--no-mk64`) the script also runs with `HOME` unset |
 | `--vcpkg-root DIR` | `$VCPKG_ROOT`, else `<build dir>/.vcpkg` (`cmake/automate-vcpkg.cmake:63`) |
 | `--no-mk64` | off. Use it where there is no ROM, such as CI. `mk64_o2r_sha256` is then `not-checked` |
 
@@ -68,7 +68,7 @@ Exit codes:
 | rc | meaning |
 |---|---|
 | `0` | record printed (17 lines) |
-| `2` | a required input is missing, empty, or a directory. stderr names it, for example `MISSING: mk64.o2r (/nonexistent/mk64.o2r)` |
+| `2` | a required input is missing, empty, or a directory. stderr names it, for example `MISSING: mk64.o2r (/nonexistent/mk64.o2r)`. `<fork-root>/vcpkg.json` is a required input (`MISSING: vcpkg.json (<path>)`). With `HOME` unset and neither `--ship-home` nor `$SHIP_HOME` nor `--no-mk64`, there is no ship home to look in: `MISSING: ship home (HOME is unset: pass --ship-home or set SHIP_HOME)` |
 | `3` | a required input is unreadable (`UNREADABLE: …`) |
 | `64` | usage error (unknown flag, or a flag without its value) |
 
@@ -98,6 +98,9 @@ MUST = peers that differ here do not start a session. SHOULD = a difference is a
 | `sse2neon_sha256` | the unpinned header compiled into the mixer | `shasum -a 256 build-cmake/_deps/sse2neon/sse2neon.h` | SHOULD |
 | `config_yml_sha256` | ROM-hash → yamls map inside the bundle | `shasum -a 256 …/Contents/Resources/config.yml` | MUST |
 | `generated_at` | UTC time the record was made | `date -u` | info |
+
+A tool field (`cmake_version`, `ninja_version`, `clang_version`, `sdk_path`) prints `absent` when the tool is not on `PATH`, and
+`unknown` when the tool runs but its first line of output is empty. No field is ever printed with an empty value.
 
 A submodule directory that was never initialised prints `absent`. The script checks for `<dir>/.git` first, because
 `git -C <empty submodule dir> rev-parse HEAD` silently returns the parent repo's commit.
