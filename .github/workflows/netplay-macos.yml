@@ -1,0 +1,74 @@
+name: netplay-macos
+on:
+  push:
+    branches: [netplay, 'np/**']
+  pull_request:
+    branches: [netplay]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-macos-arm64:
+    runs-on: macos-latest
+    timeout-minutes: 180
+    defaults: { run: { shell: bash } }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          submodules: recursive
+      - name: Runner identity (T1 OQ3)
+        run: |
+          echo "uname_m=$(uname -m)"; sw_vers; xcodebuild -version; sysctl -n hw.ncpu hw.memsize
+          echo "env_VCPKG_ROOT=${VCPKG_ROOT:-<unset>}"; echo "env_VCPKG_INSTALLATION_ROOT=${VCPKG_INSTALLATION_ROOT:-<unset>}"
+          git rev-parse HEAD; git describe --tags; df -h "$GITHUB_WORKSPACE"
+      - name: Require arm64
+        run: test "$(uname -m)" = arm64 || { echo "::error::runner is $(uname -m), expected arm64"; exit 1; }
+      - name: Install dependencies
+        run: |
+          brew install ninja cmake
+          cmake --version | head -1; ninja --version; clang --version | head -1
+      - name: vcpkg binary cache dir
+        run: mkdir -p "$HOME/.cache/vcpkg/archives" && echo "VCPKG_DEFAULT_BINARY_CACHE=$HOME/.cache/vcpkg/archives" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-${{ runner.os }}-${{ runner.arch }}-
+      - name: Configure (main.yml:101, Release, no -DVCPKG_ROOT)
+        run: |
+          mkdir -p ci-out
+          cmake -H. -Bbuild-cmake -GNinja -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DENABLE_VCPKG=ON 2>&1 | tee ci-out/configure.log
+          grep -E 'VCPKG_ROOT\.{5}:|Spaghetti Kart version:' ci-out/configure.log
+          grep -q 'Spaghetti Kart version: base-5073d2e' ci-out/configure.log || { echo "::error::tag base-5073d2e not reachable"; exit 1; }
+      - name: Build (main.yml:102, Release)
+        run: cmake --build build-cmake --config Release -j3 2>&1 | tee ci-out/build.log
+      - name: Verify bundle
+        run: |
+          APP=build-cmake/SpaghettiKart.app
+          test -x "$APP/Contents/MacOS/SpaghettiKart"
+          codesign --verify --deep --strict "$APP"
+          F=$(file "$APP/Contents/MacOS/SpaghettiKart"); echo "$F"; [[ "$F" == *arm64* ]]
+          ls "$APP/Contents/Resources"; test -s "$APP/Contents/Resources/spaghetti.o2r"; df -h "$GITHUB_WORKSPACE"
+          echo "--- vcpkg layout (0.3 L3)"
+          grep -nE 'Installing/Updating the following vcpkg-packages|Restored [0-9]+ package|error:' ci-out/configure.log | head -20 || true
+          find build-cmake -maxdepth 3 -type d \( -name vcpkg_installed -o -name installed \) 2>/dev/null
+      - name: Build identity + package
+        run: |
+          VR=$(grep -m1 'VCPKG_ROOT\.\.\.\.\.:' ci-out/configure.log | sed -E 's/.*VCPKG_ROOT\.+: //')
+          bash tools/build-identity.sh --app build-cmake/SpaghettiKart.app --vcpkg-root "$VR" --no-mk64 | tee ci-out/identity-ci.txt
+          ditto -c -k --keepParent build-cmake/SpaghettiKart.app ci-out/SpaghettiKart.app.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: netplay-macos-arm64
+          path: |
+            ci-out/SpaghettiKart.app.zip
+            ci-out/identity-ci.txt
+            ci-out/configure.log
+          retention-days: 7
+          if-no-files-found: error
