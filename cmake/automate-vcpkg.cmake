@@ -113,18 +113,75 @@ macro(vcpkg_bootstrap)
     message(STATUS "  VCPKG_BOOTSTRAP: ${VCPKG_BOOTSTRAP}")
 endmacro()
 
+# MK64 Online fork: pin the vcpkg TOOL clone (upstream clones HEAD and `git pull`s on reuse).
+# Default pin = vcpkg.json "builtin-baseline", so tool and port baseline come from one vcpkg commit.
+# -DVCPKG_PIN_COMMIT= (empty) restores the upstream behaviour (clone HEAD, git pull on reuse).
+set(_AUTOMATE_VCPKG_BASELINE 2e58bb35ff7a3a037920d959ce20cb4d8c22319a)  # fallback = vcpkg.json:46 at base 5073d2e
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.19 AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/../vcpkg.json")
+    file(READ "${CMAKE_CURRENT_LIST_DIR}/../vcpkg.json" _automate_vcpkg_manifest)
+    string(JSON _automate_vcpkg_bl ERROR_VARIABLE _automate_vcpkg_json_error GET "${_automate_vcpkg_manifest}" builtin-baseline)
+    if(NOT _automate_vcpkg_json_error)
+        set(_AUTOMATE_VCPKG_BASELINE ${_automate_vcpkg_bl})
+    endif()
+endif()
+if(NOT DEFINED VCPKG_GIT_URL)
+    set(VCPKG_GIT_URL https://github.com/Microsoft/vcpkg.git CACHE STRING "vcpkg repository to clone")
+endif()
+if(NOT DEFINED VCPKG_PIN_COMMIT)
+    set(VCPKG_PIN_COMMIT ${_AUTOMATE_VCPKG_BASELINE} CACHE STRING
+        "vcpkg tool commit to check out (empty = upstream behaviour: HEAD + git pull)")
+endif()
+
+function(_automate_vcpkg_checkout_pin)
+    string(LENGTH "${VCPKG_PIN_COMMIT}" _len)
+    if(NOT _len EQUAL 40 OR NOT VCPKG_PIN_COMMIT MATCHES "^[0-9a-f]+$")
+        message(FATAL_ERROR "***** FATAL ERROR: VCPKG_PIN_COMMIT must be a full 40-hex commit, got '${VCPKG_PIN_COMMIT}' *****")
+    endif()
+    if(NOT VCPKG_PIN_COMMIT STREQUAL _AUTOMATE_VCPKG_BASELINE)
+        message(WARNING "VCPKG_PIN_COMMIT ${VCPKG_PIN_COMMIT} differs from vcpkg.json builtin-baseline ${_AUTOMATE_VCPKG_BASELINE}")
+    endif()
+    execute_process(COMMAND git -C "${VCPKG_ROOT}" rev-parse HEAD
+                    OUTPUT_VARIABLE _head OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(_head STREQUAL VCPKG_PIN_COMMIT)
+        message(STATUS "vcpkg already at pinned commit ${VCPKG_PIN_COMMIT}")
+        return()
+    endif()
+    execute_process(COMMAND git -C "${VCPKG_ROOT}" cat-file -e "${VCPKG_PIN_COMMIT}^{commit}"
+                    RESULT_VARIABLE _have ERROR_QUIET)
+    if(NOT _have EQUAL 0)
+        message(STATUS "Fetching vcpkg ${VCPKG_PIN_COMMIT} from ${VCPKG_GIT_URL}")
+        execute_process(COMMAND git -C "${VCPKG_ROOT}" fetch --quiet "${VCPKG_GIT_URL}" "${VCPKG_PIN_COMMIT}"
+                        RESULT_VARIABLE _fetch_rc ERROR_QUIET)
+        if(NOT _fetch_rc EQUAL 0)  # server refused fetch-by-SHA: fetch its default branch instead
+            execute_process(COMMAND git -C "${VCPKG_ROOT}" fetch --quiet "${VCPKG_GIT_URL}")
+        endif()
+    endif()
+    message(STATUS "Pinning vcpkg in ${VCPKG_ROOT} to ${VCPKG_PIN_COMMIT}")
+    execute_process(COMMAND git -C "${VCPKG_ROOT}" -c advice.detachedHead=false
+                            checkout --quiet --detach "${VCPKG_PIN_COMMIT}"
+                    RESULT_VARIABLE _co_rc)
+    execute_process(COMMAND git -C "${VCPKG_ROOT}" rev-parse HEAD
+                    OUTPUT_VARIABLE _head OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(NOT _co_rc EQUAL 0 OR NOT _head STREQUAL VCPKG_PIN_COMMIT)
+        message(FATAL_ERROR "***** FATAL ERROR: could not check out vcpkg ${VCPKG_PIN_COMMIT} in ${VCPKG_ROOT} (HEAD=${_head}) *****")
+    endif()
+    # HEAD moved: the tool binary belongs to the old commit, force bootstrap to rebuild it.
+    file(REMOVE "${VCPKG_ROOT}/vcpkg" "${VCPKG_ROOT}/vcpkg.exe")
+endfunction()
+
 macro(_install_or_update_vcpkg)
     if(NOT EXISTS ${VCPKG_ROOT})
         message(STATUS "Cloning vcpkg in ${VCPKG_ROOT}")
-        execute_process(COMMAND git clone https://github.com/Microsoft/vcpkg.git ${VCPKG_ROOT})
-
-        # If a reproducible build is desired (and potentially old libraries are # ok), uncomment the
-        # following line and pin the vcpkg repository to a specific githash.
-        # execute_process(COMMAND git checkout 745a0aea597771a580d0b0f4886ea1e3a94dbca6 WORKING_DIRECTORY ${VCPKG_ROOT})
-    else()
+        execute_process(COMMAND git clone ${VCPKG_GIT_URL} ${VCPKG_ROOT})
+        if(NOT VCPKG_PIN_COMMIT STREQUAL "" AND EXISTS ${VCPKG_ROOT}/README.md)
+            _automate_vcpkg_checkout_pin()
+        endif()
+    elseif(VCPKG_PIN_COMMIT STREQUAL "")
         # The following command has no effect if the vcpkg repository is in a detached head state.
         message(STATUS "Auto-updating vcpkg in ${VCPKG_ROOT}")
         execute_process(COMMAND git pull WORKING_DIRECTORY ${VCPKG_ROOT})
+    else()
+        _automate_vcpkg_checkout_pin()
     endif()
 
     if(NOT EXISTS ${VCPKG_ROOT}/README.md)
