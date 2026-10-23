@@ -61,6 +61,7 @@ The second launch shows no prompt, and `mk64.o2r` is byte-identical afterwards.
 - `[error] The extraction process will now begin.`: the dialog text, logged at error level.
 - `[warning] CI8: null palette`: 3 lines per launch.
 - `[error] RGBA Texture that isn't 16 or 32 bit. Size = 1`: appeared during attract-mode demos, about every 5 minutes. Not seen in player races. Not triaged.
+- `[error] Failed to process models/tracks/<track>/…_packed_dl_<addr>`: 17 lines during extraction, one per affected track display list. **Unexplained.** Koopa Troopa Beach has one, but it raced with no visible defect.
 
 ## Not covered
 
