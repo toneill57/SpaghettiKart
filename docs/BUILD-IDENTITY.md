@@ -28,19 +28,30 @@ So two self-built peers would never pass the handshake. That is a decision someo
 
 ## 2. How to produce it
 
-Run it after the build has finished. While `ninja` is relinking, the binary hash would be torn.
+Run it after the build has finished. While `ninja` is relinking, the binary hash would be torn. Run it after the game's first run
+too (BUILD-MAC.md §7), because only the first run writes `mk64.o2r`; before that, add `--no-mk64`.
 
 ```bash
-# FORK      = your clone of the fork (the directory that holds build-cmake/)
-# SHIP_HOME = the runtime directory the game wrote mk64.o2r into (BUILD-MAC.md, "First run")
+# The variables are BUILD-MAC.md §0's:
+# FORK       = your clone of the fork (the directory that holds build-cmake/)
+# SHIP_HOME  = the runtime directory the game wrote mk64.o2r into (BUILD-MAC.md §7)
 # VCPKG_ROOT = the vcpkg clone you passed to cmake
+# MK64_ROOT  = the parent folder; the record goes there, OUTSIDE the repo it describes
+OUT="$MK64_ROOT/identity-$(git -C "$FORK" rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ).txt"
+test -e "$OUT" && echo "STOP: $OUT already exists"
 bash "$FORK/tools/build-identity.sh" \
   --fork-root "$FORK" \
   --app "$FORK/build-cmake/SpaghettiKart.app" \
   --ship-home "$SHIP_HOME" \
-  --vcpkg-root "$VCPKG_ROOT" > identity.txt
+  --vcpkg-root "$VCPKG_ROOT" > "$OUT"
 echo "rc=$?"
 ```
+
+The file name carries the commit and the UTC time, so two records never overwrite each other and §4 can compare any two of them.
+
+`mk64_o2r_sha256` hashes whatever `mk64.o2r` is in `--ship-home`. BUILD-MAC.md's §0 block gives every clone on one Mac the same
+`SHIP_HOME`, so that hash may come from another build's first run, and then it says nothing about this build. Measured on
+2026-10-23: a second clone's record reported the first clone's `5c90905b…015956` although the second clone never ran the game.
 
 Flags (all optional):
 
@@ -61,7 +72,8 @@ Exit codes:
 | `3` | a required input is unreadable (`UNREADABLE: …`) |
 | `64` | usage error (unknown flag, or a flag without its value) |
 
-On any non-zero exit, stdout is empty, so `> identity.txt` never holds a half record. All problems are listed, not only the first.
+On any non-zero exit, stdout is empty, so `> "$OUT"` never holds a half record: the file exists but is empty (measured: `rc=2`,
+0 bytes, with an empty `--ship-home`). All problems are listed, not only the first.
 
 ## 3. Field table
 
@@ -115,7 +127,9 @@ generated_at=2026-10-23T16:13:40Z
 ## 4. Comparing two records
 
 ```bash
-diff <(grep -v '^generated_at=' a.txt) <(grep -v '^generated_at=' b.txt)
+A="$MK64_ROOT/identity-<commit>-<time>.txt"   # the first record (§2 names them this way)
+B="$MK64_ROOT/identity-<commit>-<time>.txt"   # the second one, or a record a peer sent you
+diff <(grep -v '^generated_at=' "$A") <(grep -v '^generated_at=' "$B")
 ```
 
 - **No output:** same build.
@@ -171,6 +185,9 @@ UNVERIFIED means not measured yet.
    3 `src/engine`, 1 `src`). Control: an unrelated path = 0. No `-ffile-prefix-map` (or any `-f*-prefix-map`) exists in `cmake/`,
    `CMakeLists.txt` or `libultraship/cmake`. The paths come from `__FILE__` in log lines (`src/port/Engine.cpp:189` sets the
    `[%s:%#]` pattern). ⇒ A clone at another path gives another binary.
+   Seen again on 2026-10-23 in the BUILD-MAC.md follower build (another path, commit `3745d64dc`): 73 strings with the follower's
+   path, 0 with the local path, and `game_binary_sha256` `b29a0027…bb3a5a` instead of the local `91d3fc7b…9d998`. That build
+   also differs by commit (item 9), so which item causes the difference was not separated.
 9. **The version string is the `git describe` output.** `cmake/GetVersion.cmake:1-8` runs `git describe --tags`; the result becomes
    the compile definition `SPAGHETTI_VERSION` (`cmake/SetFlags.cmake:127`), logged at start-up by `src/port/Engine.cpp:192`
    (`Spaghetti Kart base-5073d2e-3-g8ff361451` in 0.4's log). A new commit or a new tag changes the binary even when the code is the
