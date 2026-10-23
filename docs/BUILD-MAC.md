@@ -11,7 +11,8 @@ It is the MK64 Online fork's macOS guide. Upstream's `docs/BUILDING.md` is left 
 carries its date. Nothing is estimated. What was not tested is listed in §11.
 
 A second, context-free reader then followed §0 to §6 on the same Mac (2026-10-23), in a new clone at another path, at commit
-`3745d64dc` (`base-5073d2e-7-g3745d64dc`, the commit that added this page). Its numbers are in §9, marked **follower**.
+`3745d64dc` (`base-5073d2e-7-g3745d64dc`, the commit that added this page). Its numbers are in §9, marked **follower**. It did
+not do §7 or §8 (they need a ROM, pads and a person at the screen); those were done once, on the verified build.
 
 **Which binary hash is the reference.** The local build at `8ff361451` is now
 `91d3fc7bf6e753a01d724755a2eee18a0ee9188a2b715606a19635962839d998`, the value in `docs/BUILD-IDENTITY.md` §3. It was first
@@ -51,7 +52,7 @@ saves and controller bindings. For a separate one, give that clone another `SHIP
 | What | Measured on the verified Mac | Check command |
 |---|---|---|
 | Apple Silicon | `arm64` | `uname -m` |
-| macOS | `15.6.1 (24G90)` | `sw_vers -productVersion` |
+| macOS | `ProductVersion: 15.6.1`, `BuildVersion: 24G90` | `sw_vers` |
 | Xcode (full app, selected) | `Xcode 26.3 Build version 17C529`; `/Applications/Xcode.app/Contents/Developer` | `xcodebuild -version`; `xcode-select -p` |
 | Apple clang (comes with Xcode) | `Apple clang version 17.0.0 (clang-1700.6.4.2)` | `clang --version` |
 | git | `git version 2.50.1 (Apple Git-155)` | `git --version` |
@@ -140,8 +141,8 @@ PREFLIGHT_MIN_FREE_GIB=5 bash "$FORK/tools/preflight-mac.sh"; echo "rc=$?"
 The override changes the disk check only. A `MISSING:` line still has to be fixed. 5 GiB is about three times the measured
 1.7 GB; nothing below 5 was tested. Measured on 2026-10-23: the verified Mac (26 GiB free) and the follower (24 GiB free) both
 failed the default floor with a single `DISK:` line (`PREFLIGHT: FAIL`; the follower also printed `rc=2`) and passed with
-`PREFLIGHT_MIN_FREE_GIB=20`. A floor of 5 passed (`rc=0`) on the same Mac
-with 23 GiB free.
+`PREFLIGHT_MIN_FREE_GIB=20`. A floor of 5 passed (`PREFLIGHT: OK`, `rc=0`) on the same Mac with 23 GiB free, on 2026-10-23
+at 17:03 UTC, with the follower clone's `tools/preflight-mac.sh` (clone at `3745d64dc`; the script last changed in `c53068e22`).
 
 ## 5. Configure and build
 
@@ -288,21 +289,28 @@ In the player sessions, the log had zero `[error]` and zero `[critical]` lines.
 ### 7.6 Record which build you have
 
 After the first run, `$SHIP_HOME/mk64.o2r` exists and the identity record can be made (skip this if §3's last check printed
-nothing). Write it outside the repo, under a name that says which commit and when:
+nothing). Keep the records out of git: write them to a folder that is not inside any git repository (not `$FORK`, and not
+`$MK64_ROOT` if you made that a repository), under a name that says which commit and when:
 
 ```bash
-OUT="$MK64_ROOT/identity-$(git -C "$FORK" rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ).txt"
+ID_DIR="$MK64_ROOT/identity"   # any folder outside every git repo; the check below stops if it is inside one
+mkdir -p "$ID_DIR"
+git -C "$ID_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 && echo "STOP: $ID_DIR is inside a git repo - choose a folder outside any repo"
+OUT="$ID_DIR/identity-$(git -C "$FORK" rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ).txt"
 test -e "$OUT" && echo "STOP: $OUT already exists"
 bash "$FORK/tools/build-identity.sh" --fork-root "$FORK" --app "$FORK/build-cmake/SpaghettiKart.app" \
   --ship-home "$SHIP_HOME" --vcpkg-root "$VCPKG_ROOT" > "$OUT"; echo "rc=$?"
 ```
 
-Expected: `rc=0`, and `$OUT` holds 17 `key=value` lines. `docs/BUILD-IDENTITY.md` explains every field, how to compare two
+Expected: no `STOP:` line, `rc=0`, and `$OUT` holds 17 `key=value` lines. On the verified Mac `$MK64_ROOT` is itself a git
+repository in which `identity/` is not ignored (`git check-ignore` exits 1), so the check prints `STOP:` there and the record has to
+go to another folder, such as a scratch folder outside it. `docs/BUILD-IDENTITY.md` explains every field, how to compare two
 records (§4) and why two builds differ (§5).
 
 - **Before the first run** there is no `mk64.o2r`. The tool then exits `2` with `MISSING: mk64.o2r (…)` and `$OUT` is empty.
-  Add `--no-mk64` to make the record anyway: `mk64_o2r_sha256` then reads `not-checked`. (Both measured on 2026-10-23 against the
-  follower build, with an empty `--ship-home`.)
+  Add `--no-mk64` to make the record anyway: `mk64_o2r_sha256` then reads `not-checked`. (Both measured on 2026-10-23 at 17:04 UTC
+  against the follower build at `3745d64dc`, with an empty folder as `--ship-home`, using the script as of `3745d64dc` and as of
+  `d807d6232`: without `--no-mk64` `rc=2` and 0 bytes on stdout, with it `rc=0` and 17 lines.)
 - **`mk64_o2r_sha256` hashes whatever is in `$SHIP_HOME`.** With the §0 block, every clone on this Mac uses the same `SHIP_HOME`
   (§0), so the hash can come from another build's first run and then proves nothing about this build. The follower's record
   showed exactly that: it reported the local build's `5c90905b…015956`, and the follower never extracted one itself.
@@ -367,22 +375,23 @@ driving, about 108 s (player 1 on lap 2/3 at the last screenshot), and a 2P Gran
 
 ## 9. Measured cost
 
-All values from one Mac (macOS 15.6.1 arm64, 14 CPU cores, 36 GiB RAM), a first build with a newly created, empty vcpkg binary
-cache.
+All values are from one Mac (macOS 15.6.1 arm64, 14 CPU cores, 36 GiB RAM). They are not all from one moment: the "When" column
+says, per row, whether the value comes from the first configure and build (vcpkg binary cache newly created and empty), from just
+after it (03:11), from a later step on the same build directory, or from the game's first run.
 
-| Step | Value | Date (UTC) | Commit |
-|---|---|---|---|
-| Configure (first, incl. vcpkg bootstrap + 19 ports) | 169.5 s | 2026-10-23 03:05 | `8ff361451` |
-| Build, `-j3` (Ninja total 567; last counter shown `[566/567]`) | 172.8 s | 2026-10-23 03:08 | `8ff361451` |
-| No-op rebuild (nothing changed) | 1.03 s (the asset packing step `GenerateO2R` always re-runs; nothing compiles) | 2026-10-23 03:11 | `8ff361451` |
-| Re-configure of an existing build | 6.2 s, no ports rebuilt (the next build then runs 19 compile/link steps, see BUILD-IDENTITY.md §5) | 2026-10-23 16:13 | `8ff361451` |
-| `du -sh build-cmake` | 762 MB | 2026-10-23 03:11 | `8ff361451` |
-| `du -sh "$VCPKG_ROOT"` | 863 MB (of which `buildtrees` 477 MB, `downloads` 152 MB) | 2026-10-23 03:11 | `8ff361451` |
-| `du -sh build-cmake/vcpkg_installed` (measured on its own) | 43 MB | 2026-10-23 16:21 | `8ff361451` |
-| `du -sh "$VCPKG_DEFAULT_BINARY_CACHE"` | 11 MB | 2026-10-23 03:11 | `8ff361451` |
-| Total on disk | about 1.7 GB; free space went from 26 to 25 GiB | 2026-10-23 03:11 | `8ff361451` |
-| First-run extraction | about 16 s | 2026-10-23 03:14 | `8ff361451` |
-| `mk64.o2r` | 26,664,858 bytes, 32,447 entries | 2026-10-23 03:14 | `8ff361451` |
+| Step | Value | When | Date (UTC) | Commit |
+|---|---|---|---|---|
+| Configure (first, incl. vcpkg bootstrap + 19 ports) | 169.5 s | first configure, empty binary cache | 2026-10-23 03:05 | `8ff361451` |
+| Build, `-j3` (Ninja total 567; last counter shown `[566/567]`) | 172.8 s | first build | 2026-10-23 03:08 | `8ff361451` |
+| No-op rebuild (nothing changed) | 1.03 s (the asset packing step `GenerateO2R` always re-runs; nothing compiles) | just after the first build | 2026-10-23 03:11 | `8ff361451` |
+| Re-configure of an existing build | 6.2 s, no ports rebuilt (the next build then runs 19 compile/link steps, see BUILD-IDENTITY.md §5) | later, binary cache already filled by the first configure | 2026-10-23 16:13 | `8ff361451` |
+| `du -sh build-cmake` | 762 MB | just after the first build | 2026-10-23 03:11 | `8ff361451` |
+| `du -sh "$VCPKG_ROOT"` | 863 MB (of which `buildtrees` 477 MB, `downloads` 152 MB) | just after the first build | 2026-10-23 03:11 | `8ff361451` |
+| `du -sh build-cmake/vcpkg_installed` (measured on its own) | 43 MB | later, after the re-configure above | 2026-10-23 16:21 | `8ff361451` |
+| `du -sh "$VCPKG_DEFAULT_BINARY_CACHE"` | 11 MB | just after the first build | 2026-10-23 03:11 | `8ff361451` |
+| Total on disk | about 1.7 GB; free space went from 26 to 25 GiB | first build, measured just after it | 2026-10-23 03:11 | `8ff361451` |
+| First-run extraction | about 16 s | the game's first run | 2026-10-23 03:14 | `8ff361451` |
+| `mk64.o2r` | 26,664,858 bytes, 32,447 entries | the game's first run | 2026-10-23 03:14 | `8ff361451` |
 
 **Follower build** (same Mac, a new clone at another path, the vcpkg clone and binary cache already warm from the build above):
 
@@ -390,10 +399,11 @@ cache.
 |---|---|---|---|
 | Clone + submodules (§3) | 16 s (from a local clone of the fork; submodules from GitHub) | 2026-10-23 16:30 | `3745d64dc` |
 | Configure (warm: `Restored 19 package(s)`, no bootstrap) | 55.6 s (`Configuring done`), 56 s wall clock | 2026-10-23 16:31 | `3745d64dc` |
-| Build, `-j3` (last counter `[566/567]`, 2585 `warning:` lines) | 174 s wall clock | 2026-10-23 16:35 | `3745d64dc` |
+| Build, `-j3` (last counter `[566/567]`, 2585 `warning:` lines) | 174 s wall clock, `rc=0` | 2026-10-23 16:35 | `3745d64dc` |
+| §6 checks | `binary-ok`; the six `Resources` entries; `codesign rc=0`; `Signature=adhoc`; `otool -L` lists 0 Homebrew libraries; no `gamecontrollerdb.txt` | 2026-10-23 16:35 | `3745d64dc` |
 | `du -sh build-cmake` | 762 MB | 2026-10-23 16:36 | `3745d64dc` |
 | Free disk | 24 GiB before configure, 23 GiB after the build | 2026-10-23 16:36 | `3745d64dc` |
-| `game_binary_sha256` | `b29a0027528ee77c1a06341c0843e7cb68c5c9b2d13e4e1c9f4f76fe76bb3a5a` (differs from the local build, as §1 says) | 2026-10-23 16:35 | `3745d64dc` |
+| `game_binary_sha256` | `b29a0027528ee77c1a06341c0843e7cb68c5c9b2d13e4e1c9f4f76fe76bb3a5a`. Not comparable to the local build's: this binary embeds another `git describe` (`base-5073d2e-7-g3745d64dc`, BUILD-IDENTITY.md §5 item 9) as well as another source path (item 8) | 2026-10-23 16:35 | `3745d64dc` |
 | `spaghetti_o2r_sha256` | `c84a0d22d566e3c4756ad051f9dfae9f4f767b43cf6406d9d4041720b311a291` (differs too; BUILD-IDENTITY.md §5 item 4 is one known cause, not tested here) | 2026-10-23 16:35 | `3745d64dc` |
 
 Apart from `fork_commit`, `fork_describe` and the two hashes above, its identity record matched the local one
@@ -402,8 +412,11 @@ Apart from `fork_commit`, `fork_describe` and the two hashes above, its identity
 because the follower shared the local `SHIP_HOME` (§7.6). The follower binary holds 73 strings with the follower's path and 0 with
 the local path (BUILD-IDENTITY.md §5 item 8). Which of the known causes makes its binary differ was not tested.
 
-`du` counts a hard-linked file only once per command, so measure `build-cmake/vcpkg_installed` on its own: in one `du` call
-together with `build-cmake` it showed 96 KB, because 495 of its 517 files are hard links.
+`du` counts a hard-linked file only once per command, so measure `build-cmake/vcpkg_installed` on its own. On 2026-10-23 at
+16:21 UTC (verified build, `8ff361451`), one `du` call together with `build-cmake` showed it as 96 KB, because 495 of its 517 files
+were hard links, while on its own it was 43 MB. Re-checked at 17:03 UTC the same day: in the verified build none of the 517 files
+was a hard link any more and both ways gave 43 MB; in the follower build (`3745d64dc`) 495 of 517 were, and the one-call `du` again
+gave 96 KB. What removed the links in the verified build was not measured.
 
 vcpkg packages installed (19, triplet `arm64-osx`), 2026-10-23 at `8ff361451`:
 
@@ -444,11 +457,15 @@ vcpkg packages installed (19, triplet `arm64-osx`), 2026-10-23 at `8ff361451`:
 These were not built or tested, and this page does not describe them:
 
 - The Homebrew / MacPorts dependency path in upstream `docs/BUILDING.md:188` (`-DENABLE_VCPKG=OFF`). CI does not build it either.
-- Debug builds (`-DCMAKE_BUILD_TYPE=Debug`, which uses `-O0` and turns LTO off, `cmake/SetFlags.cmake:106-110`). Only Release was built.
+- Debug builds (`-DCMAKE_BUILD_TYPE=Debug`). In the code, Debug adds `-g` (`cmake/SetFlags.cmake:78`) and, with Apple clang,
+  turns LTO off with `-fno-lto` (`cmake/SetFlags.cmake:104-111`). Only Release was built.
 - Building with only the Xcode Command Line Tools instead of the full Xcode app.
 - Intel Macs.
 - Windows and Linux.
 - Launching from Finder (§7.2 describes it from the code only).
 - One pad plus the keyboard for 2 players, and 3 or 4 players.
 - Packaging (`cpack`, a DMG), notarization, and sending the app to another Mac (Gatekeeper quarantine). Later phases (Fase 5 and 6).
-- A second build on another Mac or at another path. It is expected to produce a different binary hash: see `docs/BUILD-IDENTITY.md`.
+- A second build on another Mac. (A second build at another path on the same Mac **was** made: the follower in §9, at
+  `3745d64dc`, build `rc=0` and `codesign rc=0`. Its binary hash differs from the local one, but it also embeds another
+  `git describe` (`base-5073d2e-7-g3745d64dc`), so the two hashes are not comparable and the effect of the path alone was not
+  separated; see `docs/BUILD-IDENTITY.md` §5 items 8 and 9.)

@@ -36,8 +36,11 @@ too (BUILD-MAC.md §7), because only the first run writes `mk64.o2r`; before tha
 # FORK       = your clone of the fork (the directory that holds build-cmake/)
 # SHIP_HOME  = the runtime directory the game wrote mk64.o2r into (BUILD-MAC.md §7)
 # VCPKG_ROOT = the vcpkg clone you passed to cmake
-# MK64_ROOT  = the parent folder; the record goes there, OUTSIDE the repo it describes
-OUT="$MK64_ROOT/identity-$(git -C "$FORK" rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ).txt"
+# ID_DIR     = where the records go: a folder OUTSIDE every git repo, so a record is never committed by accident
+ID_DIR="$MK64_ROOT/identity"
+mkdir -p "$ID_DIR"
+git -C "$ID_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 && echo "STOP: $ID_DIR is inside a git repo - choose a folder outside any repo"
+OUT="$ID_DIR/identity-$(git -C "$FORK" rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ).txt"
 test -e "$OUT" && echo "STOP: $OUT already exists"
 bash "$FORK/tools/build-identity.sh" \
   --fork-root "$FORK" \
@@ -48,6 +51,12 @@ echo "rc=$?"
 ```
 
 The file name carries the commit and the UTC time, so two records never overwrite each other and §4 can compare any two of them.
+
+Keep the records out of git. `$MK64_ROOT/identity` is outside every repo only when `$MK64_ROOT` is a plain folder, as BUILD-MAC.md
+§0 creates it. On the verified Mac `$MK64_ROOT` is itself a git repository in which `identity-*.txt` and `identity/` are not ignored
+(`git check-ignore` exits 1 for both), so the check above prints `STOP:` there; use a scratch folder outside it instead. Measured on
+2026-10-23: the check prints `STOP:` for a folder inside a new `git init` repository (also with a space in the path) and nothing
+for a folder outside any repository.
 
 `mk64_o2r_sha256` hashes whatever `mk64.o2r` is in `--ship-home`. BUILD-MAC.md's §0 block gives every clone on one Mac the same
 `SHIP_HOME`, so that hash may come from another build's first run, and then it says nothing about this build. Measured on
@@ -73,7 +82,8 @@ Exit codes:
 | `64` | usage error (unknown flag, or a flag without its value) |
 
 On any non-zero exit, stdout is empty, so `> "$OUT"` never holds a half record: the file exists but is empty (measured: `rc=2`,
-0 bytes, with an empty `--ship-home`). All problems are listed, not only the first.
+0 bytes, with an empty `--ship-home`, against the BUILD-MAC.md follower build at `3745d64dc`, 2026-10-23 17:04 UTC). All problems are
+listed, not only the first.
 
 ## 3. Field table
 
@@ -130,8 +140,8 @@ generated_at=2026-10-23T16:13:40Z
 ## 4. Comparing two records
 
 ```bash
-A="$MK64_ROOT/identity-<commit>-<time>.txt"   # the first record (§2 names them this way)
-B="$MK64_ROOT/identity-<commit>-<time>.txt"   # the second one, or a record a peer sent you
+A="$ID_DIR/identity-<commit>-<time>.txt"   # the first record (§2 names them this way)
+B="$ID_DIR/identity-<commit>-<time>.txt"   # the second one, or a record a peer sent you
 diff <(grep -v '^generated_at=' "$A") <(grep -v '^generated_at=' "$B")
 ```
 
