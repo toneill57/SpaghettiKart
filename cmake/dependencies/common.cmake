@@ -49,6 +49,14 @@ add_subdirectory(libultraship ${CMAKE_BINARY_DIR}/libultraship)
 add_dependencies(${PROJECT_NAME} libultraship)
 target_link_libraries(${PROJECT_NAME} PRIVATE libultraship)
 
+# Netplay determinism contract for the port layer (T9 A6: libultraship had NO FP flag of its own).
+# Applied from the parent so the submodule stays pristine. Same contract as cmake/SetFlags.cmake.
+if(MSVC)
+  target_compile_options(libultraship PRIVATE /fp:strict)
+else()
+  target_compile_options(libultraship PRIVATE -fno-fast-math -ffp-contract=off)
+endif()
+
 # Torch
 option(USE_STANDALONE "Build as a standalone executable" OFF)
 option(BUILD_STORMLIB "Build with StormLib support" OFF)
