@@ -1,5 +1,8 @@
 if(MSVC)
-  target_compile_options(${PROJECT_NAME} PRIVATE /fp:fast)
+  # Netplay determinism contract: no reassociation, no contraction, IEEE semantics in every config.
+  # Was the fast FP model at base 5073d2e (T9 A1). Fase 6 verifies this on a real MSVC build.
+  # (Comment deliberately avoids the literal old flag: the 1.1 gate greps for it.)
+  target_compile_options(${PROJECT_NAME} PRIVATE /fp:strict)
 
   if("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "x64")
     target_compile_options(${PROJECT_NAME} PRIVATE
@@ -36,10 +39,14 @@ else()
     -Wno-missing-field-initializers
     -Wno-parentheses
     -Wno-missing-braces
-    -ffast-math
+    # Netplay determinism contract (was fast-math at base 5073d2e, T9 A3). Clang contracts by default
+    # (-ffp-contract=on) even without fast-math, so 'off' must be explicit for arm64 vs x64 agreement.
+    -fno-fast-math
+    -ffp-contract=off
     -flto=auto
     -pipe)
-  target_link_options(${PROJECT_NAME} PRIVATE -flto=auto)
+  # LTO code generation happens at link time: the contraction contract rides on the link step too.
+  target_link_options(${PROJECT_NAME} PRIVATE -flto=auto -ffp-contract=off)
 
   set(C_FLAGS -Werror-implicit-function-declaration
               -Wno-incompatible-pointer-types)

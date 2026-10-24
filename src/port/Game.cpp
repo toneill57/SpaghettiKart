@@ -3,6 +3,7 @@
 
 #include "Game.h"
 #include "port/Engine.h"
+#include "port/oracle/OracleFpEnv.h"
 
 #include <fast/Fast3dWindow.h>
 #include <memory>
@@ -1051,6 +1052,9 @@ extern "C"
 #endif
     // load_wasm();
     GameEngine::Create();
+    // After Create(): the file sink is created in Context::InitLogging during Create() (libultraship Context.cpp).
+    // WARN, not INFO: Release logs at warn (InitLogging defaults, libultraship/include/ship/Context.h).
+    SPDLOG_WARN("oracle: fp_word=0x{:016x}", Oracle_ReadFpEnvWord());
     audio_init();
     sound_init();
 
