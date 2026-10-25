@@ -396,6 +396,7 @@ void read_controllers(void) {
     osContStartReadData(&gSIEventMesgQueue);
     // osRecvMesg(&gSIEventMesgQueue, &msg, OS_MESG_BLOCK);
     osContGetReadData(gControllerPads);
+    Oracle_OnPadsRead(gControllerPads); // FASE 1.3 record / 1.5 replay — the PRE-alias raw pad, one call per read
     update_controller(0);
     update_controller(1);
     update_controller(2);

@@ -134,6 +134,8 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
   SPAGHETTI_VERSION="${PROJECT_VERSION}")
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
+# MK64 Online FASE 1.3: the build type recorded in every .mk64rec header (src/port/oracle/OracleIdentity.cpp).
+target_compile_definitions(${PROJECT_NAME} PRIVATE ORACLE_BUILD_TYPE="$<CONFIG>")
 
 if(WIN32)
   target_compile_definitions(${PROJECT_NAME} PRIVATE
