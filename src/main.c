@@ -41,6 +41,7 @@
 #include "port/Engine.h"
 #include "engine/Matrix.h"
 #include "engine/TrackBrowser.h"
+#include "port/oracle/Oracle.h"
 
 // Declarations (not in this file)
 void func_80091B78(void);
@@ -353,7 +354,7 @@ void update_controller(s32 index) {
 
     // Prevents pause menu intereference while controlling flycam
     // Freecam only works with controller 1
-    if ((CVarGetInteger("gFreecam", 0) == 1) && (gGamestate == RACING) && (index == 0)) {
+    if ((CVarGetInteger("gFreecam", 0) == 1) && (gGamestate == RACING) && (index == 0) && !Oracle_IsActive()) {
         freecam_update_controller();
         return;
     }
@@ -1167,6 +1168,7 @@ void thread5_iteration(void) {
         Graphics_PushFrame(gGfxPool->gfxPool);
         return;
     }
+    Oracle_ApplySessionGuards(); // FASE 1.2: pin gTickLogic, controller-1 present, refuse debug launch/editor/freecam
     // Update the gamestate if it has changed (racing, menus, credits, etc.).
     if (gGamestateNext != gGamestate) {
         gGamestate = gGamestateNext;

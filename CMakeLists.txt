@@ -160,6 +160,13 @@ include(cmake/dependencies/common.cmake)
 
 include(cmake/dependencies/FindLib.cmake)
 
+# MK64 Online FASE 1.2 — the determinism-oracle test suite (tests/oracle). Std-only, so it is safe in ALL.
+option(ORACLE_TESTS "Build and register the determinism-oracle tests (tests/oracle)" ON)
+if(ORACLE_TESTS AND NOT CMAKE_CROSSCOMPILING)
+  enable_testing()
+  add_subdirectory(tests/oracle)
+endif()
+
 # fmt's consteval format-string checking fails to compile under newer
 # AppleClang (Xcode 16+) with the spdlog/fmt versions in use (both vcpkg's on
 # CI and Torch's bundled copy — see cmake/TorchExternalFixes.cmake for the
