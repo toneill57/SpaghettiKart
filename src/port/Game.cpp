@@ -4,6 +4,7 @@
 #include "Game.h"
 #include "port/Engine.h"
 #include "port/oracle/OracleFpEnv.h"
+#include "port/oracle/OracleCli.h"
 
 #include <fast/Fast3dWindow.h>
 #include <memory>
@@ -1050,6 +1051,14 @@ extern "C"
     // overwrite=0 keeps any SHIP_HOME the user already set.
     setenv("SHIP_HOME", "~/Library/Application Support/SpaghettiKart", 0);
 #endif
+    // MK64 Online FASE 1.3: oracle flags, before the engine exists. No-window modes (--oracle-info, --oracle-verify) and usage
+    // errors leave here. _Exit, not return: ~World of `static World sWorldInstance` would run CleanWorld() before the world
+    // exists. _Exit does not flush stdio, hence the fflush calls.
+    if (const int rc = Oracle_ParseArgs(argc, argv); rc >= 0) {
+        std::fflush(stdout);
+        std::fflush(stderr);
+        _Exit(rc);
+    }
     // load_wasm();
     GameEngine::Create();
     // After Create(): the file sink is created in Context::InitLogging during Create() (libultraship Context.cpp).
@@ -1086,11 +1095,12 @@ extern "C"
         push_frame();
     }
     CustomEngineDestroy();
+    const bool oracleOk = Oracle_Shutdown(); // FASE 1.3: writes kRecEnd, so a normally-quit recording reads cleanEnd=true
     // GameEngine::Instance->ProcessFrame(push_frame);
     GameEngine::Instance->Destroy();
     // Everything user-visible (config, saves) is persisted by Destroy(). Skip the
     // remaining static destructors: their order is unspecified and some log after
     // spdlog's own statics are gone, crashing on quit (same class as issue #689).
     // Mirrors the _Exit precedent on the extraction error paths.
-    _Exit(0);
+    _Exit(oracleOk ? 0 : 4); // 4 = the oracle could not complete its recording (plan.md exit-code table)
 }
