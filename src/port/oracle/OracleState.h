@@ -12,6 +12,7 @@ struct OracleConfig {
     std::string recordPath;  // --oracle-record <path>
     std::string replayPath;  // --oracle-replay <path>
     std::string hashLogPath; // --oracle-hash-log <path>; defaults to <record|replay path>.mk64hash
+    bool hashLogDefaulted = false; // FASE 1.5: no --oracle-hash-log given (a replay refuses an existing default)
     uint16_t seed = 0x1234;  // --oracle-seed N  (FASE 1.7)
     bool exitAtEnd = false;
     int32_t dumpAtIteration = -1; // --oracle-dump-at N (FASE 1.6)
@@ -39,3 +40,10 @@ bool Oracle_Shutdown();
 // unless --oracle-probe-straddle.
 void Oracle_ProbeAtIterationEnd(uint32_t iteration, const oracle::GroupHashes& g);
 void Oracle_ProbeAfterAudio();
+
+// FASE 1.5 replay (Oracle.cpp), for FASE 1.7. C++ only — never in the C header Oracle.h.
+namespace oracle {
+struct Recording;
+}
+const oracle::Recording* Oracle_ReplayRecording(); // nullptr unless --oracle-replay; loads (and checks) on first use
+bool Oracle_ReplayPastEnd(); // true once the recording is exhausted and live pads are fed (no --oracle-exit-at-end)

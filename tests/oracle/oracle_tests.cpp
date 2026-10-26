@@ -17,6 +17,10 @@
 #include "port/oracle/OracleCli.h"
 #include "port/oracle/OracleHashLog.h"
 #include "port/oracle/OracleIdentityHash.h"
+#include "port/oracle/OracleReplay.h"
+#include "port/oracle/OracleArchiveHash.h"
+
+#include <cstddef> // offsetof (--print-offsets)
 
 static int gFailures = 0;
 #define CHECK(cond)                                                              \
@@ -41,11 +45,24 @@ static void test_mod_list_hash();          // 1.4.5 probes 3-4
 static void test_config_hash();            // 1.4.5 probe 2
 static void test_cvar_sweep();             // 1.4.5 probe 2: re-runs the sweep over src/ (critic)
 static void test_cli_probe_flags();        // 1.4.5 probe 1
+static void test_replay_compat();          // 1.5.2
+static void test_replay_cursor();          // 1.5.2
+static void test_apply_pads_keeps_gyro();  // 1.5.2
+static void test_replay_hash_log_path();   // 1.5.4
+static void test_zip_content_hash();       // 1.5 amendment: portArchiveHash = content hash
 
 int main(int argc, char** argv) {
-    (void) argc;
-    (void) argv;
-    // 1.5 adds `--print-offsets` here (prints offsetof fields, returns 0)
+    // Packed offsets measured by the compiler that writes the files (FASE 1.5 Validation Commands): a byte patch of a
+    // .mk64rec takes its offset from here, never from a table.
+    if (argc > 1 && std::strcmp(argv[1], "--print-offsets") == 0) {
+        std::printf("offsetof tickLogic=%zu\n", offsetof(oracle::Header, tickLogic));
+        std::printf("sizeof Header=%zu\n", sizeof(oracle::Header));
+        std::printf("sizeof PadsRecord=%zu\n", sizeof(oracle::PadsRecord));
+        std::printf("offsetof PadsRecord.pads=%zu\n", offsetof(oracle::PadsRecord, pads));
+        std::printf("sizeof Pad=%zu\n", sizeof(oracle::Pad));
+        std::printf("offsetof Pad.stick_x=%zu\n", offsetof(oracle::Pad, stick_x));
+        return 0;
+    }
     test_guard_table();
     test_guard_fatal_before_pin();
     test_fnv_known_answers();
@@ -60,6 +77,11 @@ int main(int argc, char** argv) {
     test_config_hash();
     test_cvar_sweep();
     test_cli_probe_flags();
+    test_replay_compat();
+    test_replay_cursor();
+    test_apply_pads_keeps_gyro();
+    test_replay_hash_log_path();
+    test_zip_content_hash();
     std::printf("oracle_tests: %d failure(s)\n", gFailures);
     return gFailures == 0 ? 0 : 1;
 }
@@ -983,4 +1005,409 @@ static void test_cli_probe_flags() {
     CHECK(Parse({ "--oracle-info", rec.string(), "--oracle-probe-audio-serial" }, cfg) == 2);
     CHECK(Parse({ "--oracle-info", rec.string(), "--oracle-probe-tick-at", "5" }, cfg) == 2);
     CHECK(Parse({ "--oracle-verify", "a", "b", "--oracle-probe-straddle" }, cfg) == 2);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// FASE 1.5 — replay mode. Written before OracleReplay.cpp / OracleArchiveHash.cpp (RED first).
+
+namespace {
+
+// Mirrors OSContPad's field NAMES, not its layout: ApplyRecordedPads is a template, so the test proves "only the five named
+// fields are written" without pulling libultraship into this target.
+struct FakePad {
+    uint16_t button;
+    int8_t stick_x, stick_y;
+    uint8_t err_no;
+    float gyro_x, gyro_y;
+    int8_t right_stick_x, right_stick_y;
+};
+
+oracle::Header BaseHeader() {
+    oracle::Header h{};
+    std::snprintf(h.buildVersion, sizeof h.buildVersion, "1.0.0");
+    std::snprintf(h.compiler, sizeof h.compiler, "clang 17.0.0");
+    std::snprintf(h.buildType, sizeof h.buildType, "Release");
+    std::snprintf(h.platform, sizeof h.platform, "macos-arm64");
+    h.gameArchiveHash = 0x11;
+    h.portArchiveHash = 0x22;
+    h.binaryHash = 0x33;
+    h.modListHash = 0x44;
+    h.configHash = 0x55;
+    h.tickLogic = 2;
+    h.fpWord = 0x1F80;
+    h.skipIntro = 3;
+    h.seed = 0x1234;
+    return h;
+}
+
+// One refusal field each, in the order the user sees them: toolchain identity, then archives and simulation parameters.
+struct RefusalCase {
+    const char* field;
+    void (*mutate)(oracle::Header&);
+};
+const RefusalCase kRefusalCases[] = {
+    { "compiler", [](oracle::Header& h) { std::snprintf(h.compiler, sizeof h.compiler, "clang 18.0.0"); } },
+    { "buildType", [](oracle::Header& h) { std::snprintf(h.buildType, sizeof h.buildType, "Debug"); } },
+    { "platform", [](oracle::Header& h) { std::snprintf(h.platform, sizeof h.platform, "windows-x64"); } },
+    { "gameArchiveHash", [](oracle::Header& h) { h.gameArchiveHash = 0x99; } },
+    { "portArchiveHash", [](oracle::Header& h) { h.portArchiveHash = 0x99; } },
+    { "tickLogic", [](oracle::Header& h) { h.tickLogic = 3; } },
+    { "fpWord", [](oracle::Header& h) { h.fpWord = 0x9F80; } },
+    { "configHash", [](oracle::Header& h) { h.configHash = 0x99; } },
+    { "modListHash", [](oracle::Header& h) { h.modListHash = 0x99; } },
+    { "skipIntro", [](oracle::Header& h) { h.skipIntro = 0; } },
+};
+
+} // namespace
+
+static void test_replay_compat() {
+    const oracle::Header live = BaseHeader();
+    {
+        const oracle::Compat c = oracle::CheckCompatible(BaseHeader(), live);
+        CHECK(c.ok && c.field.empty() && c.notes.empty() && !c.archivesUnchecked);
+    }
+    // The TODO's named case: the recording came from a session that was not pinned at 2.
+    {
+        oracle::Header rec = BaseHeader();
+        rec.tickLogic = 3;
+        const oracle::Compat c = oracle::CheckCompatible(rec, live);
+        CHECK(!c.ok && c.field == "tickLogic" && c.recorded == "0x0000000000000003" && c.live == "0x0000000000000002");
+    }
+    // Every refusal field is named on its own (one mutation per field, nothing else differs).
+    for (const RefusalCase& rc : kRefusalCases) {
+        oracle::Header rec = BaseHeader();
+        rc.mutate(rec);
+        const oracle::Compat c = oracle::CheckCompatible(rec, live);
+        if (c.ok || c.field != rc.field) {
+            std::fprintf(stderr, "  refusal case %s: ok=%d field=%s\n", rc.field, c.ok ? 1 : 0, c.field.c_str());
+        }
+        CHECK(!c.ok && c.field == rc.field);
+    }
+    // A string field reports both values as text.
+    {
+        oracle::Header rec = BaseHeader();
+        std::snprintf(rec.buildType, sizeof rec.buildType, "Debug");
+        const oracle::Compat c = oracle::CheckCompatible(rec, live);
+        CHECK(c.field == "buildType" && c.recorded == "Debug" && c.live == "Release");
+    }
+    // Order: with fields k..end all differing, field k is named — the whole user-visible order, and the first refusal wins.
+    for (size_t k = 0; k < std::size(kRefusalCases); k++) {
+        oracle::Header rec = BaseHeader();
+        for (size_t j = k; j < std::size(kRefusalCases); j++) {
+            kRefusalCases[j].mutate(rec);
+        }
+        CHECK(oracle::CheckCompatible(rec, live).field == kRefusalCases[k].field);
+    }
+    // The seed is NOT compared: FASE 1.7 writes gRandomSeed16 = header.seed.
+    {
+        oracle::Header rec = BaseHeader();
+        rec.seed = 0x4321;
+        const oracle::Compat c = oracle::CheckCompatible(rec, live);
+        CHECK(c.ok && c.notes.empty());
+    }
+    // buildVersion (git describe) and binaryHash (every rebuild) are informational: a LATER commit's binary replaying the
+    // committed baseline is accepted, with one note each.
+    {
+        oracle::Header rec = BaseHeader();
+        std::snprintf(rec.buildVersion, sizeof rec.buildVersion, "base-5073d2e-7-gabc1234");
+        rec.binaryHash = 0x99;
+        const oracle::Compat c = oracle::CheckCompatible(rec, live);
+        CHECK(c.ok && c.notes.size() == 2);
+        CHECK(c.notes.size() == 2 && Contains(c.notes[0], "buildVersion") && Contains(c.notes[0], "base-5073d2e-7-gabc1234") &&
+              Contains(c.notes[1], "binaryHash"));
+        rec = BaseHeader();
+        rec.binaryHash = 0x99;
+        CHECK(oracle::CheckCompatible(rec, live).notes.size() == 1);
+    }
+    // Equal zero archive hashes prove nothing: accepted, flagged unchecked (either archive).
+    {
+        oracle::Header rec = BaseHeader(), lv = BaseHeader();
+        rec.gameArchiveHash = lv.gameArchiveHash = 0;
+        const oracle::Compat c = oracle::CheckCompatible(rec, lv);
+        CHECK(c.ok && c.archivesUnchecked);
+        rec = BaseHeader();
+        lv = BaseHeader();
+        rec.portArchiveHash = lv.portArchiveHash = 0;
+        CHECK(oracle::CheckCompatible(rec, lv).ok && oracle::CheckCompatible(rec, lv).archivesUnchecked);
+        // …but a zero against a real hash is a difference, not "unchecked".
+        rec = BaseHeader();
+        rec.gameArchiveHash = 0;
+        const oracle::Compat d = oracle::CheckCompatible(rec, live);
+        CHECK(!d.ok && d.field == "gameArchiveHash" && !d.archivesUnchecked);
+    }
+    // Fixed char[] fields: a field filled to its full size has no NUL (strnlen-bounded), and bytes after a NUL are not text.
+    {
+        oracle::Header rec = BaseHeader(), lv = BaseHeader();
+        std::memset(rec.compiler, 'x', sizeof rec.compiler);
+        std::memset(lv.compiler, 'x', sizeof lv.compiler);
+        CHECK(oracle::CheckCompatible(rec, lv).ok);
+        lv.compiler[sizeof lv.compiler - 1] = 'y';
+        const oracle::Compat c = oracle::CheckCompatible(rec, lv);
+        CHECK(!c.ok && c.field == "compiler" && c.recorded.size() == sizeof rec.compiler);
+        rec = BaseHeader();
+        std::memcpy(rec.platform + 12, "junk", 4); // after "macos-arm64\0"
+        CHECK(oracle::CheckCompatible(rec, live).ok);
+    }
+}
+
+static void test_replay_cursor() {
+    oracle::Recording r;
+    const oracle::PadsRecord* p = nullptr;
+    uint32_t got = 0;
+    {
+        oracle::ReplayCursor c(r); // empty recording: End at iteration 0
+        CHECK(c.next(0, &p, &got) == oracle::Step::End && c.fed() == 0);
+    }
+    for (uint32_t i = 0; i < 3; i++) {
+        r.pads.push_back({ oracle::kRecPads, i, {} });
+    }
+    {
+        oracle::ReplayCursor c(r);
+        for (uint32_t i = 0; i < 3; i++) {
+            p = nullptr;
+            CHECK(c.next(i, &p, &got) == oracle::Step::Feed && p != nullptr && p->iteration == i);
+        }
+        CHECK(c.next(3, &p, &got) == oracle::Step::End && c.fed() == 3);
+        CHECK(c.next(4, &p, &got) == oracle::Step::End && c.fed() == 3); // stays at End
+    }
+    r.pads[1].iteration = 5; // a hole in the file
+    {
+        oracle::ReplayCursor c(r);
+        CHECK(c.next(0, &p, &got) == oracle::Step::Feed);
+        got = 0;
+        CHECK(c.next(1, &p, &got) == oracle::Step::Misaligned && got == 5);
+        got = 0;
+        CHECK(c.next(1, &p, &got) == oracle::Step::Misaligned && got == 5 && c.fed() == 1); // never skips past it
+    }
+    r.pads[1].iteration = 0; // a repeated iteration
+    {
+        oracle::ReplayCursor c(r);
+        CHECK(c.next(0, &p, &got) == oracle::Step::Feed);
+        CHECK(c.next(1, &p, &got) == oracle::Step::Misaligned && got == 0);
+    }
+}
+
+static void test_apply_pads_keeps_gyro() {
+    oracle::PadsRecord r{ oracle::kRecPads, 0, {} };
+    r.pads[1] = { 0x8004, -12, 77, 5, -6 };
+    r.pads[3] = { 0x0001, 1, 2, 3, 4 };
+    FakePad live[4] = {};
+    for (FakePad& f : live) {
+        f.button = 0xFFFF; // a live controller held during the replay: overwrite, never OR
+        f.stick_x = 100;
+        f.right_stick_y = 100;
+    }
+    live[1].gyro_x = 1.5f;
+    live[1].gyro_y = -2.5f;
+    live[1].err_no = 9;
+    oracle::ApplyRecordedPads(r, live);
+    CHECK(live[1].button == 0x8004 && live[1].stick_x == -12 && live[1].stick_y == 77 && live[1].right_stick_x == 5 &&
+          live[1].right_stick_y == -6);
+    // Untouched by design; 0x8004 keeps bit 0x4 (C-down), so update_controller's Z_TRIG alias still happens later.
+    CHECK(live[1].gyro_x == 1.5f && live[1].gyro_y == -2.5f && live[1].err_no == 9);
+    CHECK(live[0].button == 0 && live[0].stick_x == 0 && live[0].right_stick_y == 0); // every slot, slot 0 included
+    CHECK(live[3].button == 0x0001 && live[3].stick_x == 1 && live[3].stick_y == 2 && live[3].right_stick_x == 3 &&
+          live[3].right_stick_y == 4);
+}
+
+static void test_replay_hash_log_path() {
+    const auto rec = TempPath("replay-path.mk64rec");
+    CHECK(WriteSample(rec, 2, false, true));
+    const std::string recPath = rec.string();
+    const std::string def = recPath + ".mk64hash";
+    std::error_code ec;
+    std::filesystem::remove(def, ec);
+    CHECK(oracle::CheckReplayHashLogPath(recPath, def, true).empty()); // the default does not exist yet
+    { std::ofstream(def) << "MK64HASH 1\n"; }                           // the recording run's log
+    const std::string why = oracle::CheckReplayHashLogPath(recPath, def, true);
+    CHECK(Contains(why, "already exists") && Contains(why, "--oracle-hash-log"));
+    CHECK(oracle::CheckReplayHashLogPath(recPath, def, false).empty()); // an explicit --oracle-hash-log always wins
+    // …except onto the recording itself (it was just loaded; the log would truncate it), by any spelling.
+    CHECK(Contains(oracle::CheckReplayHashLogPath(recPath, recPath, false), "recording"));
+    const std::string other = (rec.parent_path() / "." / rec.filename()).string();
+    CHECK(other != recPath && Contains(oracle::CheckReplayHashLogPath(recPath, other, false), "recording"));
+    CHECK(oracle::CheckReplayHashLogPath(recPath, TempPath("replay-path.out.mk64hash").string(), false).empty());
+    // The parser says whether the path was defaulted.
+    OracleConfig cfg;
+    CHECK(Parse({ "--oracle-replay", "r.mk64rec" }, cfg) == -1 && cfg.hashLogDefaulted);
+    CHECK(Parse({ "--oracle-replay", "r.mk64rec", "--oracle-hash-log", "r.mk64rec.mk64hash" }, cfg) == -1 &&
+          !cfg.hashLogDefaulted && cfg.hashLogPath == "r.mk64rec.mk64hash");
+    CHECK(Parse({}, cfg) == -1 && !cfg.hashLogDefaulted);
+}
+
+namespace {
+
+// Independent of the code under test: a bitwise CRC-32 (IEEE, reflected 0xEDB88320) and a minimal zip writer (stored
+// entries), so the archives below are real zips whose only difference is the one each case names.
+uint32_t TestCrc32(const std::string& s) {
+    uint32_t c = 0xFFFFFFFFu;
+    for (unsigned char b : s) {
+        c ^= b;
+        for (int k = 0; k < 8; k++) {
+            c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u)));
+        }
+    }
+    return ~c;
+}
+
+struct ZipEntry {
+    std::string name, data;
+    bool deflated = false;           // method 8 with a compressed size != the real size (the parser never inflates)
+    std::string extra, comment = ""; // per-entry extra field and comment (central directory)
+};
+
+void Le(std::string& out, uint64_t v, int n) {
+    for (int i = 0; i < n; i++) {
+        out.push_back((char) (uint8_t) (v >> (8 * i)));
+    }
+}
+
+// dosTime/dosDate stamp every entry (local header and central directory), like the packer's pack time.
+std::string MakeZip(const std::vector<ZipEntry>& entries, uint16_t dosTime, uint16_t dosDate, const std::string& comment = "",
+                    int64_t totalOverride = -1) {
+    std::string out, cd;
+    for (const ZipEntry& e : entries) {
+        const uint32_t crc = TestCrc32(e.data);
+        const uint32_t offset = (uint32_t) out.size();
+        // A "deflated" entry stores a payload of another length: only the compressed size moves, never the content.
+        const std::string payload = e.deflated ? std::string(e.data.size() + 3, 'c') : e.data;
+        const uint16_t method = e.deflated ? 8 : 0;
+        Le(out, 0x04034b50, 4);
+        Le(out, 20, 2);
+        Le(out, 0, 2);
+        Le(out, method, 2);
+        Le(out, dosTime, 2);
+        Le(out, dosDate, 2);
+        Le(out, crc, 4);
+        Le(out, payload.size(), 4);
+        Le(out, e.data.size(), 4);
+        Le(out, e.name.size(), 2);
+        Le(out, 0, 2);
+        out += e.name;
+        out += payload;
+        Le(cd, 0x02014b50, 4);
+        Le(cd, 20, 2);
+        Le(cd, 20, 2);
+        Le(cd, 0, 2);
+        Le(cd, method, 2);
+        Le(cd, dosTime, 2);
+        Le(cd, dosDate, 2);
+        Le(cd, crc, 4);
+        Le(cd, payload.size(), 4);
+        Le(cd, e.data.size(), 4);
+        Le(cd, e.name.size(), 2);
+        Le(cd, e.extra.size(), 2);
+        Le(cd, e.comment.size(), 2);
+        Le(cd, 0, 2);
+        Le(cd, 0, 2);
+        Le(cd, 0, 4);
+        Le(cd, offset, 4);
+        cd += e.name;
+        cd += e.extra;
+        cd += e.comment;
+    }
+    const uint32_t cdOffset = (uint32_t) out.size();
+    out += cd;
+    const uint64_t total = totalOverride >= 0 ? (uint64_t) totalOverride : entries.size();
+    Le(out, 0x06054b50, 4);
+    Le(out, 0, 2);
+    Le(out, 0, 2);
+    Le(out, total, 2);
+    Le(out, total, 2);
+    Le(out, cd.size(), 4);
+    Le(out, cdOffset, 4);
+    Le(out, comment.size(), 2);
+    out += comment;
+    return out;
+}
+
+std::filesystem::path WriteFile(const char* name, const std::string& bytes) {
+    const auto p = TempPath(name);
+    std::ofstream(p, std::ios::binary).write(bytes.data(), (std::streamsize) bytes.size());
+    return p;
+}
+
+uint64_t RawFnv(const std::string& s) {
+    oracle::Hasher h;
+    h.bytes(s.data(), s.size());
+    return h.value();
+}
+
+} // namespace
+
+static void test_zip_content_hash() {
+    const std::vector<ZipEntry> base = { { "a.bin", "hello" }, { "dir/b.bin", "world" } };
+    const std::string zA = MakeZip(base, 0x6000, 0x5B5A);
+    const std::string zStamp = MakeZip(base, 0x7421, 0x5B5B); // the same content packed at another time
+    CHECK(zA.size() == zStamp.size() && RawFnv(zA) != RawFnv(zStamp)); // control: the raw bytes DO differ
+    const oracle::ZipContent a = oracle::HashZipContent(WriteFile("zip-a.o2r", zA).string());
+    const oracle::ZipContent stamp = oracle::HashZipContent(WriteFile("zip-stamp.o2r", zStamp).string());
+    CHECK(a.error.empty() && a.entries == 2 && a.hash != 0);
+    // Known answer, computed independently (python3: zlib.crc32 + struct.pack('<I…') over the canonical form documented in
+    // OracleArchiveHash.h) — pins the formula, not only its properties.
+    CHECK(a.hash == 0xeb69cd7d23b5e055ull);
+    CHECK(stamp.error.empty() && stamp.hash == a.hash); // timestamps are not content
+    // One entry's bytes change → its CRC changes → a different hash.
+    const oracle::ZipContent bytes =
+        oracle::HashZipContent(WriteFile("zip-bytes.o2r", MakeZip({ { "a.bin", "hello" }, { "dir/b.bin", "worle" } }, 0x6000, 0x5B5A)).string());
+    CHECK(bytes.error.empty() && bytes.hash != a.hash);
+    // A renamed entry → different.
+    const oracle::ZipContent renamed =
+        oracle::HashZipContent(WriteFile("zip-renamed.o2r", MakeZip({ { "c.bin", "hello" }, { "dir/b.bin", "world" } }, 0x6000, 0x5B5A)).string());
+    CHECK(renamed.error.empty() && renamed.hash != a.hash);
+    // Names and contents stay paired: swapping the two contents is a different archive.
+    const oracle::ZipContent swapped =
+        oracle::HashZipContent(WriteFile("zip-swapped.o2r", MakeZip({ { "a.bin", "world" }, { "dir/b.bin", "hello" } }, 0x6000, 0x5B5A)).string());
+    CHECK(swapped.error.empty() && swapped.hash != a.hash);
+    // Entry order in the file is not content (the packer may walk directories in any order).
+    const oracle::ZipContent reversed =
+        oracle::HashZipContent(WriteFile("zip-reversed.o2r", MakeZip({ base[1], base[0] }, 0x6000, 0x5B5A)).string());
+    CHECK(reversed.error.empty() && reversed.hash == a.hash);
+    // An archive comment is found behind (the end record is searched backwards) and is not content.
+    const oracle::ZipContent commented =
+        oracle::HashZipContent(WriteFile("zip-comment.o2r", MakeZip(base, 0x6000, 0x5B5A, "packed by test")).string());
+    CHECK(commented.error.empty() && commented.hash == a.hash);
+    // Compression is not content: the real packer deflates every entry (369/369), and a zlib version or level change moves
+    // only the compressed size — the uncompressed size is what is hashed.
+    {
+        const std::vector<ZipEntry> deflated = { { "a.bin", "hello", true }, { "dir/b.bin", "world", true } };
+        const oracle::ZipContent d = oracle::HashZipContent(WriteFile("zip-deflated.o2r", MakeZip(deflated, 0x6000, 0x5B5A)).string());
+        CHECK(d.error.empty() && d.hash == a.hash);
+    }
+    // Per-entry extra fields and comments are skipped by their declared lengths, and are not content.
+    {
+        const std::vector<ZipEntry> extras = { { "a.bin", "hello", false, std::string("\x55\x54\x05\x00\x01\x00\x00\x00\x00", 9), "c1" },
+                                               { "dir/b.bin", "world", false, "", "second entry comment" } };
+        const oracle::ZipContent x = oracle::HashZipContent(WriteFile("zip-extras.o2r", MakeZip(extras, 0x6000, 0x5B5A)).string());
+        CHECK(x.error.empty() && x.entries == 2 && x.hash == a.hash);
+    }
+    // An empty archive is valid and distinct from a failure (0).
+    const oracle::ZipContent empty = oracle::HashZipContent(WriteFile("zip-empty.o2r", MakeZip({}, 0, 0)).string());
+    CHECK(empty.error.empty() && empty.entries == 0 && empty.hash == 0x4d25767f9dce13f5ull); // FNV of U32(0)
+    // Failures → hash 0 and the reason of THAT check (each case is caught where it should be, not by a later check that
+    // happens to see the same corruption), never a crash or an out-of-bounds read.
+    auto fails = [](const oracle::ZipContent& z, const char* why) {
+        if (z.hash != 0 || !Contains(z.error, why)) {
+            std::fprintf(stderr, "  zip failure case: hash=0x%016llx error=\"%s\" (want \"%s\")\n", (unsigned long long) z.hash,
+                         z.error.c_str(), why);
+        }
+        return z.hash == 0 && Contains(z.error, why);
+    };
+    CHECK(fails(oracle::HashZipContent((std::filesystem::temp_directory_path() / "mk64-no-such-dir" / "x.o2r").string()), "cannot open"));
+    CHECK(fails(oracle::HashZipContent(WriteFile("zip-not.o2r", std::string(100, 'z')).string()), "not a zip"));
+    CHECK(fails(oracle::HashZipContent(WriteFile("zip-short.o2r", "PK").string()), "too short"));
+    CHECK(fails(oracle::HashZipContent(WriteFile("zip-cut.o2r", zA.substr(0, zA.size() - 10)).string()), "not a zip"));
+    CHECK(fails(oracle::HashZipContent(WriteFile("zip-count.o2r", MakeZip(base, 0x6000, 0x5B5A, "", 3)).string()), "truncated or malformed"));
+    CHECK(fails(oracle::HashZipContent(WriteFile("zip-count-low.o2r", MakeZip(base, 0x6000, 0x5B5A, "", 1)).string()), "more than"));
+    CHECK(fails(oracle::HashZipContent(WriteFile("zip-zip64.o2r", MakeZip(base, 0x6000, 0x5B5A, "", 0xFFFF)).string()), "ZIP64"));
+    {
+        std::string bad = zA; // the second central-directory entry claims a 0xFFFF-byte name
+        const size_t cd2 = bad.rfind(std::string("\x50\x4b\x01\x02", 4));
+        CHECK(cd2 != std::string::npos);
+        if (cd2 != std::string::npos) {
+            bad[cd2 + 28] = (char) 0xFF;
+            bad[cd2 + 29] = (char) 0xFF;
+        }
+        CHECK(fails(oracle::HashZipContent(WriteFile("zip-name-overrun.o2r", bad).string()), "runs past"));
+    }
 }

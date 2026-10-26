@@ -36,7 +36,7 @@ struct Header {
     char buildType[16];    // ORACLE_BUILD_TYPE ($<CONFIG>)
     char platform[16];     // "macos-arm64", "windows-x64"
     uint64_t gameArchiveHash; // FNV-1a-64 of mk64.o2r
-    uint64_t portArchiveHash; // FNV-1a-64 of spaghetti.o2r
+    uint64_t portArchiveHash; // FASE 1.5: CONTENT hash of spaghetti.o2r (OracleArchiveHash.h), not its raw bytes
     uint64_t binaryHash;      // FNV-1a-64 of the running executable — INFORMATIONAL in Fase 1, enforced by Fase 3
     uint64_t modListHash;     // FASE 1.4: mod load order + registry ids (OracleIdentityHash.h HashModList)
     uint64_t configHash;      // FASE 1.4: the simulation-relevant CVars (OracleIdentityHash.h kSimCVars)
@@ -96,6 +96,8 @@ struct IdentityProbe {
     std::string portArchivePath;
     std::string binaryPath;
     size_t modListEntries = 0; // FASE 1.4: mods + registry entries behind modListHash (positive control: > 0)
+    size_t portArchiveEntries = 0; // FASE 1.5: zip entries behind portArchiveHash (positive control: > 0)
+    std::string portArchiveError;  // FASE 1.5: why portArchiveHash is 0, if it is
 };
 
 // The run's build identity (OracleIdentity.cpp — game target only: it needs libultraship's Context and CVars).

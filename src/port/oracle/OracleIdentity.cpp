@@ -2,6 +2,7 @@
 #include <libultraship.h>
 
 #include "OracleRecording.h"
+#include "OracleArchiveHash.h" // FASE 1.5: portArchiveHash = content hash
 #include "OracleHash.h"
 #include "OracleFpEnv.h"
 #include "OracleStateHash.h" // ConfigHash, ModListHash (FASE 1.4)
@@ -74,8 +75,12 @@ oracle::Header oracle::MakeHeader(int32_t tickLogic, uint16_t seed, IdentityProb
     const std::string gamePath = Ship::Context::GetPathRelativeToAppDirectory(kGameArchive);
     const std::string portPath = Ship::Context::LocateFileAcrossAppDirs(kPortArchive);
     const std::string binaryPath = ExecutablePath();
-    h.gameArchiveHash = HashFile(gamePath);
-    h.portArchiveHash = HashFile(portPath);
+    h.gameArchiveHash = HashFile(gamePath); // mk64.o2r is extracted once from the ROM: its raw bytes are stable (1.3)
+    // spaghetti.o2r is re-packed by every build with fresh entry timestamps (1.3): hash its CONTENT, never the raw file
+    // (FASE 1.5 amendment, Tarek 2026-10-25). 0 when absent or not a readable zip (LocateFileAcrossAppDirs falls back to
+    // "./spaghetti.o2r", never ""), with the reason in the probe — the replay then flags it unchecked.
+    const oracle::ZipContent port = oracle::HashZipContent(portPath);
+    h.portArchiveHash = port.hash;
     h.binaryHash = HashFile(binaryPath); // spec consequence #6 — recorded and printed; enforced only by Fase 3
     h.fpWord = Oracle_ReadFpEnvWord();
     h.tickLogic = tickLogic;
@@ -85,7 +90,7 @@ oracle::Header oracle::MakeHeader(int32_t tickLogic, uint16_t seed, IdentityProb
     h.configHash = oracle::ConfigHash();                   // FASE 1.4.5 probe 2 (T3 P11)
     h.modListHash = oracle::ModListHash(&modListEntries); // FASE 1.4.5 probes 3-4 (T3 P13/P14)
     if (probe != nullptr) {
-        *probe = IdentityProbe{ gamePath, portPath, binaryPath, modListEntries };
+        *probe = IdentityProbe{ gamePath, portPath, binaryPath, modListEntries, port.entries, port.error };
     }
     return h;
 }
