@@ -19,7 +19,7 @@
 //   camera-ptr  the index in cameras[] (src/camera.c), -1 for null
 //   flag-ptr    which target (a small enum: own member / a named global / other), then the POINTED value when the target is
 //               known memory
-//   table-key   the key that names the pointed table in its owning map
+//   table-key   the name that registers the pointed table in its registry (gItemTableRegistry), then the table itself
 //   cup-ptr     the index in World::Cups, -1 for null
 //   group:<g>   hashed by another group's walk (named), e.g. World::Actors by `actors`
 //   statics     a class static: hashed ONCE per iteration by the class's HashStatics(), called from the `world` group
@@ -448,7 +448,6 @@ inline constexpr CoverageRow kHashed[] = {
     { "PlayerBombKart", "_idx", "size_t" },
     { "RaceManager", "mHumanItemTable", "table-key" },
     { "RaceManager", "mCPUItemTable", "table-key" },
-    { "RaceManager", "mItemTables", "map-sorted" },
     { "RandomItemTable", "mDistanceEnabled", "scalar" },
     { "RandomItemTable::ItemEntry", "Id", "scalar" },
     { "RandomItemTable::ItemEntry", "Weight", "scalar" },
@@ -687,6 +686,9 @@ inline constexpr CoverageRow kHashed[] = {
 };
 
 inline constexpr CoverageRow kExcluded[] = {
+    { "RaceManager", "mItemTables",
+      "dead: never written or read (rg: the declaration only) — the active tables live in gItemTableRegistry and are "
+      "hashed through mHumanItemTable / mCPUItemTable" },
     { "TrackBrowser", "mTracks",
       "registry-derived: gTrackRegistry's track list sorted by id (TrackBrowser.h constructor / Refresh); identity covered by "
       "modListHash" },
