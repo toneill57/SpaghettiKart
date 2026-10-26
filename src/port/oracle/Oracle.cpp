@@ -6,6 +6,7 @@
 #include "OracleState.h"
 #include "OracleGuards.h"
 #include "OracleRecording.h"
+#include "OracleReplay.h"
 #include "OracleHashLog.h"
 #include "OracleStateHash.h"
 
@@ -13,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <spdlog/spdlog.h>
 
 #include "engine/editor/Editor.h" // Editor_IsEnabled (C bridge, Editor.h:63)
@@ -28,6 +30,9 @@ extern uint8_t __osMaxControllers;
 }
 
 static_assert(DEBUG_MENU_SELECTED == DEBUG_MENU_OPTION_SELECTED, "OracleGuards.h constant drifted from src/menus.h");
+// The recorder narrows and the replay widens OSContPad::button through oracle::Pad::button (CONTROLLERBUTTONS_T is
+// overridable in libultraship's controller.h): a wider type would silently drop buttons in both directions.
+static_assert(sizeof(OSContPad::button) == sizeof(oracle::Pad::button), "OSContPad::button width != .mk64rec Pad::button");
 
 namespace {
 
@@ -36,6 +41,13 @@ uint32_t sIteration = 0;  // read_controllers() calls since launch while the ora
 bool sOpened = false;
 oracle::Header sHeader{}; // the run's identity: FASE 1.4 prints it in the hash log; FASE 1.5 sets it from the recording
 oracle::HashLogWriter sHashLog; // FASE 1.4: one line per PADS record, in record AND replay
+
+// FASE 1.5 replay. sRecording is written once (EnsureLoaded), then read-only.
+oracle::Recording sRecording;
+oracle::ReplayCursor sCursor(sRecording); // binds by reference; used only after EnsureLoaded filled sRecording
+bool sReplayLoaded = false;
+bool sLive = false;        // the recording is exhausted and live pads are fed (no --oracle-exit-at-end)
+bool sReplayEnded = false; // the end of the recording was reached (exit-at-end or the switch to live pads)
 
 // Hash cost (logged once at iteration 0 and summarised at shutdown).
 uint64_t sHashMicrosTotal = 0;
@@ -58,6 +70,31 @@ const char* FormatReason(const char* what, const std::string& detail) { // Oracl
     return sReason.c_str();
 }
 
+void OpenHashLog() {
+    if (sHeader.magic[0] == 0) { // a wiring bug, never an empty metadata line
+        Oracle_Abort("hash log: the run's header is not set (record: EnsureOpened; replay: FASE 1.5 sets it from the "
+                     "recording)");
+    }
+    const std::string& path = Oracle_Config().hashLogPath;
+    if (!sHashLog.open(path, sHeader)) {
+        SPDLOG_CRITICAL("oracle: {}", sHashLog.lastError);
+        Oracle_Abort(FormatReason("hash log open failed", sHashLog.lastError));
+    }
+    SPDLOG_WARN("oracle: hash log {}", path);
+}
+
+// The live identity and where it was read from (a zero hash must be explainable). Record: the recording's header; replay:
+// the header the recording is checked against.
+void LogIdentity(const oracle::Header& h, const oracle::IdentityProbe& probe) {
+    SPDLOG_WARN("oracle: identity game={} 0x{:016x} port={} 0x{:016x} binary={} 0x{:016x}", probe.gameArchivePath,
+                h.gameArchiveHash, probe.portArchivePath, h.portArchiveHash, probe.binaryPath, h.binaryHash);
+    SPDLOG_WARN("oracle: identity configHash=0x{:016x} modListHash=0x{:016x} modListEntries={} portArchiveEntries={}",
+                h.configHash, h.modListHash, probe.modListEntries, probe.portArchiveEntries);
+    if (!probe.portArchiveError.empty()) {
+        SPDLOG_WARN("oracle: portArchiveHash is 0: {}", probe.portArchiveError);
+    }
+}
+
 void EnsureOpened() {
     const OracleConfig& cfg = Oracle_Config();
     if (sOpened || cfg.mode != OracleMode::Record) {
@@ -71,25 +108,110 @@ void EnsureOpened() {
     }
     SPDLOG_WARN("oracle: record {} binaryHash=0x{:016x} gameArchiveHash=0x{:016x}", cfg.recordPath, sHeader.binaryHash,
                 sHeader.gameArchiveHash);
-    SPDLOG_WARN("oracle: identity game={} 0x{:016x} port={} 0x{:016x} binary={} 0x{:016x}", probe.gameArchivePath,
-                sHeader.gameArchiveHash, probe.portArchivePath, sHeader.portArchiveHash, probe.binaryPath,
-                sHeader.binaryHash);
-    SPDLOG_WARN("oracle: identity configHash=0x{:016x} modListHash=0x{:016x} modListEntries={}", sHeader.configHash,
-                sHeader.modListHash, probe.modListEntries);
+    LogIdentity(sHeader, probe);
     sOpened = true;
 }
 
-void OpenHashLog() {
-    if (sHeader.magic[0] == 0) { // a wiring bug, never an empty metadata line
-        Oracle_Abort("hash log: the run's header is not set (record: EnsureOpened; replay: FASE 1.5 sets it from the "
-                     "recording)");
+// Every replay exit goes through here: the hash log is closed (`END n`) and the logger flushed by Oracle_Shutdown, then
+// _Exit — the primitive main uses (Game.cpp), so no static destructor runs mid-iteration and no CVar/save is written.
+[[noreturn]] void ReplayExit(int code, const std::string& msg) {
+    if (code == 0) {
+        SPDLOG_WARN("oracle: {}", msg);
+    } else {
+        SPDLOG_CRITICAL("oracle: {}", msg);
     }
-    const std::string& path = Oracle_Config().hashLogPath;
-    if (!sHashLog.open(path, sHeader)) {
-        SPDLOG_CRITICAL("oracle: {}", sHashLog.lastError);
-        Oracle_Abort(FormatReason("hash log open failed", sHashLog.lastError));
+    std::fprintf(code == 0 ? stdout : stderr, "oracle: %s\n", msg.c_str());
+    if (!Oracle_Shutdown() && code == 0) {
+        code = 4; // the hash log could not be completed: never report a clean end
     }
-    SPDLOG_WARN("oracle: hash log {}", path);
+    std::fflush(nullptr);
+    std::_Exit(code);
+}
+
+// FASE 1.5.3: load the recording and check it at the FIRST pads read (the startup read, main.c thread5_game_loop) — after
+// GameEngine::Create() (MakeHeader needs the CVar store and the app paths) and before the first hash line (1.4 opens the
+// hash log at the first iteration end, which needs sHeader).
+void EnsureLoaded() {
+    const OracleConfig& cfg = Oracle_Config();
+    if (sReplayLoaded || cfg.mode != OracleMode::Replay) {
+        return;
+    }
+    std::string err;
+    if (!oracle::read(cfg.replayPath, sRecording, err)) {
+        ReplayExit(2, "cannot load recording " + cfg.replayPath + ": " + err);
+    }
+    const std::string pathProblem = oracle::CheckReplayHashLogPath(cfg.replayPath, cfg.hashLogPath, cfg.hashLogDefaulted);
+    if (!pathProblem.empty()) {
+        ReplayExit(2, pathProblem);
+    }
+    // Checked against the tick count the session WILL run at: the 1.2 pin has not run yet at the startup read, and the
+    // recorder wrote gTickLogic at the same moment (2) — a recorded value != 2 means the recording session was not pinned.
+    oracle::IdentityProbe probe;
+    const oracle::Header live = oracle::MakeHeader(ORACLE_TICK_LOGIC, cfg.seed, &probe);
+    LogIdentity(live, probe);
+    const oracle::Compat c = oracle::CheckCompatible(sRecording.header, live);
+    if (!c.ok) {
+        // The header layout did not change in 1.5, the meaning of this field did: say so, or the refusal reads as an asset
+        // change.
+        const char* hint = c.field == "portArchiveHash"
+                               ? " (a content hash since FASE 1.5: a recording made before 1.5 holds the raw-file hash — re-record it)"
+                               : "";
+        ReplayExit(3, "recording incompatible: field " + c.field + " recorded=" + c.recorded + " live=" + c.live + hint);
+    }
+    for (const std::string& n : c.notes) {
+        SPDLOG_WARN("oracle: META {} (informational, not refused)", n);
+    }
+    if (c.archivesUnchecked) {
+        SPDLOG_WARN("oracle: archive hash is 0 in the recording — asset identity NOT checked");
+    }
+    sHeader = sRecording.header; // the hash log's metadata = the RECORDING's identity ⇒ record and replay logs cmp equal
+    if (!sRecording.cleanEnd) {
+        SPDLOG_WARN("oracle: recording has no END record (truncated) — replaying {} complete PADS records",
+                    sRecording.pads.size());
+    }
+    if (sRecording.pads.empty()) {
+        SPDLOG_WARN("oracle: recording holds 0 PADS records");
+    }
+    SPDLOG_WARN("oracle: replay {} — {} PADS, {} events, cleanEnd={}, hash log {}", cfg.replayPath, sRecording.pads.size(),
+                sRecording.events.size(), sRecording.cleanEnd, cfg.hashLogPath);
+    sReplayLoaded = true;
+}
+
+// FASE 1.5.4. iterations 0..N-1 were fed (and hashed by 1.4); this is the read of iteration N = the PADS count.
+void OnEndOfRecording() {
+    const std::string msg = "end of recording at iteration " + std::to_string(sIteration) + " (" +
+                            std::to_string(sCursor.fed()) + " PADS fed)";
+    sReplayEnded = true;
+    if (Oracle_Config().exitAtEnd) {
+        if (!sHashLog.isOpen()) {
+            OpenHashLog(); // 0 PADS: a header-only log with `END 0`, never no file (a stale one would be read instead)
+        }
+        ReplayExit(0, msg + ", --oracle-exit-at-end");
+    }
+    SPDLOG_WARN("oracle: {} — switching to LIVE pads from iteration {}", msg, sIteration); // once: sLive stops the cursor
+    sLive = true;
+}
+
+void ReplayPads(OSContPad* pads) {
+    if (sLive) {
+        return;
+    }
+    const oracle::PadsRecord* rec = nullptr;
+    uint32_t recIter = 0;
+    switch (sCursor.next(sIteration, &rec, &recIter)) {
+        case oracle::Step::Feed:
+            oracle::ApplyRecordedPads(*rec, pads);
+            return;
+        case oracle::Step::Misaligned: {
+            static char sReason[96];
+            std::snprintf(sReason, sizeof sReason, "replay misaligned: live iteration %u, recording holds iteration %u",
+                          sIteration, recIter);
+            Oracle_Abort(sReason);
+        }
+        case oracle::Step::End:
+            OnEndOfRecording();
+            return;
+    }
 }
 
 void LogHashCost(uint32_t iteration, uint64_t micros) {
@@ -155,7 +277,15 @@ bool Oracle_Shutdown() {
         SPDLOG_CRITICAL("oracle: closing the recording failed: {}", sWriter.lastError);
         sOk = false;
     }
-    if (sHashLog.isOpen() && !sHashLog.close()) { // writes `END n`
+    if (sReplayLoaded && !sReplayEnded) {
+        // A replay stopped before the end of its recording (window closed, Cmd-Q): its log is a prefix, not a run. No
+        // `END`, so 1.6 reads it as truncated, and main exits 4 — an incomplete replay never looks like a clean one.
+        SPDLOG_CRITICAL("oracle: replay stopped at iteration {} before the end of the recording ({} of {} PADS fed) — "
+                        "hash log left without END",
+                        sIteration, sCursor.fed(), sRecording.pads.size());
+        sHashLog.flush();
+        sOk = false;
+    } else if (sHashLog.isOpen() && !sHashLog.close()) { // writes `END n`
         SPDLOG_CRITICAL("oracle: closing the hash log failed: {}", sHashLog.lastError);
         sOk = false;
     }
@@ -219,6 +349,7 @@ extern "C" void Oracle_OnPadsRead(OSContPad* pads) {
         Oracle_Abort(FormatReason("MAXCONTROLLERS != 4", "__osMaxControllers=" + std::to_string(__osMaxControllers)));
     }
     EnsureOpened();
+    EnsureLoaded();
     if (cfg.mode == OracleMode::Record) {
         oracle::Pad p[4];
         for (int i = 0; i < 4; i++) { // the PRE-alias raw pad: update_controller() has not run yet (main.c:367-368)
@@ -230,9 +361,19 @@ extern "C" void Oracle_OnPadsRead(OSContPad* pads) {
             std::snprintf(sReason, sizeof sReason, "record write failed at iteration %u", sIteration);
             Oracle_Abort(sReason);
         }
+    } else if (cfg.mode == OracleMode::Replay) {
+        ReplayPads(pads); // overwrites the PRE-alias pad: update_controller() recomputes the alias and the edges identically
     }
-    // FASE 1.5 adds the Replay branch here (overwrite pads[] from the recording BEFORE update_controller)
-    sIteration++;
+    sIteration++; // the one counter for PADS records (1.3), replay feeding (1.5) and hash lines (1.4)
+}
+
+const oracle::Recording* Oracle_ReplayRecording() {
+    EnsureLoaded();
+    return sReplayLoaded ? &sRecording : nullptr;
+}
+
+bool Oracle_ReplayPastEnd() {
+    return sLive;
 }
 
 // FASE 1.4.4: one `.mk64hash` line per PADS record — the state the pads of iteration `sIteration - 1` produced. Called at

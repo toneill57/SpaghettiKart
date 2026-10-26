@@ -132,6 +132,7 @@ int Oracle_ParseArgsInto(int argc, char** argv, OracleConfig& cfg) {
     }
     if (cfg.mode != OracleMode::Off && cfg.hashLogPath.empty()) {
         cfg.hashLogPath = (cfg.mode == OracleMode::Record ? cfg.recordPath : cfg.replayPath) + ".mk64hash";
+        cfg.hashLogDefaulted = true; // FASE 1.5: a replay refuses this path if it already exists (the recording's log)
     }
     return -1;
 }

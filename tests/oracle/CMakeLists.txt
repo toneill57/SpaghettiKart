@@ -9,6 +9,7 @@ add_executable(oracle_tests oracle_tests.cpp ${ORACLE_SRC}/OracleGuards.cpp)    
 #   1.8 add_test(oracle_replay_verify_script …) · 1.9 the CLI tests
 target_sources(oracle_tests PRIVATE ${ORACLE_SRC}/OracleRecording.cpp ${ORACLE_SRC}/OracleState.cpp
                ${ORACLE_SRC}/OracleCli.cpp ${ORACLE_SRC}/OracleVerify.cpp)                # FASE 1.3
+target_sources(oracle_tests PRIVATE ${ORACLE_SRC}/OracleReplay.cpp ${ORACLE_SRC}/OracleArchiveHash.cpp)  # FASE 1.5
 target_include_directories(oracle_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${ORACLE_SRC})   # tests include "port/oracle/X.h"
 set_property(TARGET oracle_tests PROPERTY CXX_STANDARD 20)
 target_compile_definitions(oracle_tests PRIVATE ORACLE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
