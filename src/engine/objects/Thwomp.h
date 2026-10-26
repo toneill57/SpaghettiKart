@@ -69,6 +69,7 @@ public:
     virtual void Tick60fps() override;
     virtual void Draw(s32 cameraId) override;
     virtual void DrawEditorProperties() override;
+    void HashState(oracle::Hasher& h) const override; // MK64 Online FASE 1.4
     void SetVisibility(s32 objectIndex);
     void func_80080B28(s32 objectIndex, s32 playerId);
     void DrawModel(s32, s32);

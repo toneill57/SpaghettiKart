@@ -46,6 +46,7 @@ public:
     virtual void Tick() override;
     virtual void Tick60fps() override;
     virtual void Draw(s32 playerId) override;
+    void HashState(oracle::Hasher& h) const override; // MK64 Online FASE 1.4
 
     void func_80078F64();
     void func_80079054(s32 playerId);

@@ -1155,6 +1155,7 @@ void thread5_game_loop(void) {
     rendering_init();
     read_controllers();
     func_800C5CB8();
+    Oracle_OnIterationEnd(); // FASE 1.4: hash line 0 — the state after the startup read
 }
 
 void thread5_iteration(void) {
@@ -1181,6 +1182,7 @@ void thread5_iteration(void) {
     FB_CreateFramebuffers();
     clear_framebuffer(0); // Clear the framebuffer
     game_state_handler();
+    Oracle_OnIterationEnd(); // FASE 1.4: hash the state this iteration's pads produced (one line per read_controllers())
 
     // call_render_hook();
 

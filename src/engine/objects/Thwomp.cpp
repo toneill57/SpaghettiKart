@@ -1,6 +1,7 @@
 #include <libultraship.h>
 #include <libultra/gbi.h>
 #include "Thwomp.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4: oracle state hash
 #include <vector>
 #include "engine/tracks/Track.h"
 #include "engine/World.h"
@@ -51,6 +52,9 @@ s16 D_800E597C[] = { 0x0000, 0x0000, 0x4000, 0x8000, 0x8000, 0xc000 };
 
 size_t OThwomp::_count = 0;
 size_t OThwomp::_rand = 0;
+// MK64 Online FASE 1.4: was `static s32 temp_s7` inside OThwomp::func_8007F75C — hoisted (pure rename, same zero
+// initial value) so the oracle can hash it. Shared by every Thwomp instance, exactly as the function-static was.
+static s32 sThwompTempS7 = 0;
 
 OThwomp::OThwomp(const SpawnParams& params) : OObject(params) { // s16 x, s16 z, s16 direction, f32 scale, s16 behaviour, s16 primAlpha, u16 boundingBoxSize) {
     FVector loc = params.Location.value_or(FVector{0, 0, 0});
@@ -393,7 +397,6 @@ void OThwomp::func_8007F8D8() {
 
 s32 OThwomp::func_8007F75C(s32 playerId) {
     s32 someIndex;
-    static s32 temp_s7 = 0; // Must be static to sync far travelling thwomp instances
     s32 var_s6;
     s32 waypoint;
 
@@ -401,11 +404,11 @@ s32 OThwomp::func_8007F75C(s32 playerId) {
     var_s6 = 0;
     if ((waypoint >= 0xAA) && (waypoint < 0xB5)) {
         if (_idx == 0) {
-            temp_s7 = random_int(0x0032U) + 0x32;
+            sThwompTempS7 = random_int(0x0032U) + 0x32; // Must be static to sync far travelling thwomp instances
         }
         if (gObjectList[_objectIndex].unk_0D5 == 3) {
             var_s6 = 1;
-            OThwomp::func_8007F660(_objectIndex, playerId, temp_s7);
+            OThwomp::func_8007F660(_objectIndex, playerId, sThwompTempS7);
         }
 
     } else if ((waypoint >= 0xD7) && (waypoint < 0xE2)) {
@@ -1580,4 +1583,17 @@ void OThwomp::DrawEditorProperties() {
         BoundingBoxSize = 0;
         gObjectList[_objectIndex].boundingBoxSize = 0;
     }
+}
+
+// MK64 Online FASE 1.4: the oracle hashes the private state that gObjectList does not carry, including the two statics
+// every Thwomp shares (_rand and the hoisted sThwompTempS7).
+void OThwomp::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "BoundingBoxSize", BoundingBoxSize);
+    put(h, "Behaviour", Behaviour);
+    put(h, "PrimAlpha", PrimAlpha);
+    put(h, "_idx", _idx);
+    put(h, "_faceDirection", _faceDirection);
+    put(h, "_rand", (uint64_t) _rand);
+    put(h, "temp_s7", sThwompTempS7);
 }

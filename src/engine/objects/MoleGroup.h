@@ -27,6 +27,7 @@ public:
     }
 
     virtual void Tick() override;
+    void HashState(oracle::Hasher& h) const override; // MK64 Online FASE 1.4
 
     void func_80081FF4(s32 objectIndex);
 

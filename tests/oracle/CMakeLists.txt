@@ -11,7 +11,8 @@ target_sources(oracle_tests PRIVATE ${ORACLE_SRC}/OracleRecording.cpp ${ORACLE_S
                ${ORACLE_SRC}/OracleCli.cpp ${ORACLE_SRC}/OracleVerify.cpp)                # FASE 1.3
 target_include_directories(oracle_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${ORACLE_SRC})   # tests include "port/oracle/X.h"
 set_property(TARGET oracle_tests PROPERTY CXX_STANDARD 20)
-target_compile_definitions(oracle_tests PRIVATE ORACLE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+target_compile_definitions(oracle_tests PRIVATE ORACLE_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+                           ORACLE_SOURCE_DIR="${CMAKE_SOURCE_DIR}/src")  # FASE 1.4: the CVar sweep test
 if(MSVC)
   target_compile_options(oracle_tests PRIVATE /fp:strict)
   set_property(TARGET oracle_tests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

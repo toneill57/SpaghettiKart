@@ -63,6 +63,7 @@ public:
     virtual void Tick() override;
     virtual void Draw(s32 cameraId) override;
     virtual void DrawEditorProperties() override;
+    void HashState(oracle::Hasher& h) const override; // MK64 Online FASE 1.4
     void func_800523B8(s32 objectIndex, s32 cameraId, u32 arg2);
 
     void func_8007CA70(void);

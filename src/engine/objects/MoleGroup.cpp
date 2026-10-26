@@ -1,5 +1,6 @@
 #include "MoleGroup.h"
 #include "Mole.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4: oracle state hash
 
 extern "C" {
 #include "code_80057C60.h"
@@ -71,4 +72,20 @@ void OMoleGroup::func_80081FF4(s32 objectIndex) {
     gObjectList[objectIndex].origin_pos[0] = _moles[mole].Pos.x * xOrientation;
     gObjectList[objectIndex].origin_pos[1] = _moles[mole].Pos.y - 9.0;
     gObjectList[objectIndex].origin_pos[2] = _moles[mole].Pos.z;
+}
+
+// MK64 Online FASE 1.4: the oracle hashes the private state that gObjectList does not carry.
+void OMoleGroup::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_tickRate", (uint64_t) _tickRate);
+    put(h, "_idx", (uint64_t) _idx);
+    put(h, "_moles.size", (uint64_t) _moles.size());
+    oracle::Hasher::Scope s(h, "_moles");
+    for (size_t i = 0; i < _moles.size(); i++) {
+        oracle::Hasher::Scope e(h, i);
+        const MoleEntry& m = _moles[i];
+        put(h, "mole", m.Mole != nullptr ? m.Mole->_objectIndex : -2); // the OMole by its slot, never its address
+        put(h, "Pos", m.Pos);
+        put(h, "Active", m.Active);
+    }
 }

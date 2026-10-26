@@ -1,6 +1,7 @@
 #include <libultraship.h>
 #include <libultra/gbi.h>
 #include "Lakitu.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4: oracle state hash
 #include <vector>
 #include "port/interpolation/FrameInterpolation.h"
 
@@ -948,4 +949,14 @@ void OLakitu::func_8007AA44(s32 playerId) {
         default:
             break;
     }
+}
+
+// MK64 Online FASE 1.4: the oracle hashes the private state that gObjectList does not carry.
+void OLakitu::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_idx", (uint64_t) _idx);
+    put(h, "_type", _type);
+    put(h, "mPlayerId", mPlayerId);
+    put(h, "mCameraId", mCameraId);
+    put(h, "mLakituId", mLakituId);
 }

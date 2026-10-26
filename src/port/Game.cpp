@@ -987,10 +987,19 @@ static void ApplyPendingReset() {
 
 void push_frame() {
     ApplyPendingReset();
+    // MK64 Online FASE 1.4.5 probe 1: --oracle-probe-audio-serial runs the audio frame to completion BEFORE the iteration,
+    // so the audio thread never overlaps it (the straddle window then holds only the main thread's render path).
+    const bool serialAudio = Oracle_Config().probeAudioSerial;
     GameEngine::StartAudioFrame();
+    if (serialAudio) {
+        GameEngine::EndAudioFrame();
+    }
     GameEngine::Instance->StartFrame();
     thread5_iteration();
-    GameEngine::EndAudioFrame();
+    if (!serialAudio) {
+        GameEngine::EndAudioFrame();
+    }
+    Oracle_ProbeAfterAudio(); // no-op unless --oracle-probe-straddle
     // thread5_game_loop();
     // Graphics_ThreadUpdate();w
 }
@@ -1095,7 +1104,8 @@ extern "C"
         push_frame();
     }
     CustomEngineDestroy();
-    const bool oracleOk = Oracle_Shutdown(); // FASE 1.3: writes kRecEnd, so a normally-quit recording reads cleanEnd=true
+    // FASE 1.3: writes kRecEnd, so a normally-quit recording reads cleanEnd=true; FASE 1.4: `END n` closes the hash log.
+    const bool oracleOk = Oracle_Shutdown();
     // GameEngine::Instance->ProcessFrame(push_frame);
     GameEngine::Instance->Destroy();
     // Everything user-visible (config, saves) is persisted by Destroy(). Skip the
