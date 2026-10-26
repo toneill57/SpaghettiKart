@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include <vector>
 #include <memory>
@@ -275,3 +276,12 @@ void KalimariDesert::DrawCredits() {
 }
 
 void KalimariDesert::Destroy() { }
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void KalimariDesert::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    Track::HashState(h);
+    put(h, "_numTrains", (uint64_t) _numTrains);
+    put(h, "_numCarriages", (uint64_t) _numCarriages);
+    put(h, "_tender", _tender);
+}

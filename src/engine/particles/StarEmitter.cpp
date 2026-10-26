@@ -1,6 +1,7 @@
 
 
 #include "StarEmitter.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "port/interpolation/FrameInterpolation.h"
 
 extern "C" {
@@ -179,4 +180,14 @@ void StarEmitter::func_80077450(s32 objectIndex) {
         gObjectList[objectIndex].unk_084[1] = sp3A;
         gObjectList[objectIndex].unk_084[2] = sp38;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void StarEmitter::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    ParticleEmitter::HashState(h);
+    put(h, "Diameter", Diameter);
+    put(h, "MirrorModeAngleOffset", MirrorModeAngleOffset);
+    put(h, "ObjectIndex", ObjectIndex);
+    put(h, "_next", _next);
 }

@@ -1,4 +1,5 @@
 #include "BowserStatue.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 
 #include <libultra/gbi.h>
 #include "engine/Matrix.h"
@@ -58,3 +59,16 @@ void ABowserStatue::Draw(Camera *camera) {
 }
 
 bool ABowserStatue::IsMod() { return true; }
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void ABowserStatue::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "mBehaviour", mBehaviour);
+    put(h, "_idx", (uint64_t) _idx);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void ABowserStatue::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
+}

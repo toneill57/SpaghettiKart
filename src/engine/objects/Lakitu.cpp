@@ -960,3 +960,8 @@ void OLakitu::HashState(oracle::Hasher& h) const {
     put(h, "mCameraId", mCameraId);
     put(h, "mLakituId", mLakituId);
 }
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OLakitu::HashStatics(oracle::Hasher& h) {
+    oracle::put(h, "_count", (uint64_t) _count);
+}

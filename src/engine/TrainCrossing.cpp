@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "TrainCrossing.h"
 #include "World.h"
 #include "engine/Actor.h"
@@ -84,4 +85,16 @@ f32 TrainCrossing::DynamicRadius(Vec3f trainPos, Vec3f trainVelocity, Vec3f cros
         // Train has passed the crossing
         return ExitRadius;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void TrainCrossing::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "Position", Position);
+    put(h, "OnTriggered", OnTriggered);
+    put(h, "Timer", Timer);
+    put(h, "WaypointMin", WaypointMin);
+    put(h, "WaypointMax", WaypointMax);
+    put(h, "ApproachRadius", ApproachRadius);
+    put(h, "ExitRadius", ExitRadius);
 }

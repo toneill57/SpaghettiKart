@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include <vector>
 #include <memory>
@@ -259,3 +260,13 @@ void ToadsTurnpike::DrawCredits() {
 }
 
 void ToadsTurnpike::Destroy() { }
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void ToadsTurnpike::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    Track::HashState(h);
+    put(h, "_numTrucks", (uint64_t) _numTrucks);
+    put(h, "_numBuses", (uint64_t) _numBuses);
+    put(h, "_numTankerTrucks", (uint64_t) _numTankerTrucks);
+    put(h, "_numCars", (uint64_t) _numCars);
+}

@@ -36,4 +36,7 @@ private:
     size_t _numBuses = 7;
     size_t _numTankerTrucks = 7;
     size_t _numCars = 7;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const override;
 };

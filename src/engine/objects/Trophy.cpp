@@ -1,4 +1,6 @@
 #include "Trophy.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
+#include "port/oracle/OracleState.h"    // MK64 Online FASE 1.4b: Oracle_Abort
 #include "assets/models/common_data.h"
 #include "assets/models/data_segment2.h"
 #include "port/Game.h"
@@ -430,4 +432,28 @@ void OTrophy::DrawEditorProperties() {
     if (ImGui::Combo("##Behaviour", &behaviour, items2, IM_ARRAYSIZE(items2))) {
         _bhv = static_cast<Behaviour>(behaviour);
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OTrophy::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    oracle::PutEmitterPtr(h, "_emitter", _emitter, "OTrophy::_emitter");
+    put(h, "_type", _type);
+    put(h, "_bhv", _bhv);
+    put(h, "_toggle", _toggle);
+    // flag-ptr: which flag the trophy follows (0 its own _toggle, 1 the C global D_801658CE, 2 null), then its value.
+    uint8_t target = 2;
+    if (_toggleVisibility == &_toggle) {
+        target = 0;
+    } else if (_toggleVisibility == &D_801658CE) {
+        target = 1;
+    } else if (_toggleVisibility != nullptr) {
+        Oracle_Abort("state hash: OTrophy::_toggleVisibility points at neither _toggle nor D_801658CE");
+    }
+    put(h, "_toggleVisibility.target", target);
+    if (target != 2) {
+        put(h, "_toggleVisibility", *_toggleVisibility);
+    }
+    put(h, "_oldPos", _oldPos);
+    put(h, "_isMod", _isMod);
 }

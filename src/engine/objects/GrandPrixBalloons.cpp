@@ -1,4 +1,5 @@
 #include "GrandPrixBalloons.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 
 #include "port/Game.h"
 #include "assets/textures/other_textures.h"
@@ -243,4 +244,21 @@ void OGrandPrixBalloons::func_80041480(s16* arg0, s16 arg1, s16 arg2, s16* arg3)
         *arg0 = arg1;
         *arg3 = -*arg3;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OGrandPrixBalloons::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_idx", _idx);
+    put(h, "Pos", Pos);
+    put(h, "_active", _active);
+    put(h, "_numBalloons", (uint64_t) _numBalloons);
+    put(h, "_numBalloons2", (uint64_t) _numBalloons2);
+    put(h, "_numBalloons3", (uint64_t) _numBalloons3);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OGrandPrixBalloons::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

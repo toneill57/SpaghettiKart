@@ -61,4 +61,7 @@ public:
     bool IsTourComplete();
     bool MoveCameraAlongSpline(f32* arg1, std::vector<KeyFrame>& keyFrame);
     void Draw();
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const override;
 };

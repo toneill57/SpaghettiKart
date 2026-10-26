@@ -1,4 +1,5 @@
 #include "Ship.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 
 #include <libultra/gbi.h>
 #include "engine/CoreMath.h"
@@ -162,4 +163,10 @@ void AShip::DrawEditorProperties() {
         FVector scale = FVector(0.4f, 0.4f, 0.4f);
         SetScale(scale);
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void AShip::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "SpawnSkin", SpawnSkin);
 }

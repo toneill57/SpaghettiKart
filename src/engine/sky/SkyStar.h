@@ -45,4 +45,8 @@ private:
     s8 mUnk_0CF;
     s16 mUnk_0AC;
     s8 mUnk_0D0;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const override;
+    static void HashStatics(oracle::Hasher& h);
 };

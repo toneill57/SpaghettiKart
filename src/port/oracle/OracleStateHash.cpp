@@ -1,9 +1,11 @@
-// The ONE walk over the simulation state (FASE 1.4.2): nine groups + `all`, field by field. Game target only.
+// The ONE walk over the simulation state (FASE 1.4.2): ten groups + `all`, field by field (`world`: FASE 1.4b). Game target
+// only. What each class contributes, member by member, is OracleCoverage.h (oracle_tests enforces it).
 #include <libultraship.h>
 
 #include "OracleStatePut.h"
 #include "OracleStateHash.h"
 #include "OracleIdentityHash.h"
+#include "OracleState.h" // Oracle_Abort
 
 #include <memory>
 #include <spdlog/spdlog.h>
@@ -14,6 +16,7 @@
 #include "engine/World.h"
 #include "engine/Actor.h"
 #include "engine/objects/Object.h"
+#include "engine/particles/ParticleEmitter.h"
 #include "engine/mods/ModMetadata.h"
 #include "port/Game.h" // gTrackRegistry / gActorRegistry / gItemRegistry, GetWorld()
 #include "ship/resource/archive/Archive.h"
@@ -112,7 +115,6 @@ void HashActors(Hasher& h) {
             continue;
         }
         // Not hashed: the vptr, Model / Name / ResourceName (pointers), uuid (no writer anywhere), Triangles.
-        // Subclass state is NOT covered in v1 (implement/fase-1.md §1.4 gap inventory).
         const AActor& a = *v[i];
         put(h, "Type", a.Type);
         put(h, "Flags", a.Flags);
@@ -131,6 +133,10 @@ void HashActors(Hasher& h) {
         put(h, "Scale", a.Scale);
         put(h, "Speed", a.Speed);
         put(h, "bPendingDestroy", a.bPendingDestroy);
+        // FASE 1.4b: subclass state. Under its own path segment: ATree re-declares Flags / State / BoundingBoxSize / Unk_08,
+        // so the base's and the subclass's members would otherwise share a dump path.
+        Hasher::Scope sub(h, "sub");
+        a.HashState(h);
     }
 }
 
@@ -166,6 +172,15 @@ void HashCameras(Hasher& h) {
     World* w = GetWorld();
     put(h, "count", (uint64_t) (w != nullptr ? w->Cameras.size() : 0));
     put(h, "cameras", cameras); // all 16, stale slots included (T4 C13: identical in both runs)
+}
+
+// FASE 1.4b: World-level state outside the Actors / Objects deques and the class statics (World::HashState, World.cpp).
+void HashWorld(Hasher& h) {
+    World* w = GetWorld();
+    put(h, "world", w != nullptr);
+    if (w != nullptr) {
+        w->HashState(h);
+    }
 }
 
 void HashRaceArrays(Hasher& h) {
@@ -204,8 +219,8 @@ std::vector<RegistryEntry> RegistryEntries(const Registry<TInfo, TArgs...>& r) {
 
 GroupHashes oracle::HashState(FieldSink* sink) {
     using Fn = void (*)(Hasher&);
-    static constexpr Fn kFns[kGroupCount] = { HashRng,    HashRace,    HashPlayers, HashControllers, HashObjects,
-                                              HashActors, HashOObjects, HashCameras, HashRaceArrays };
+    static constexpr Fn kFns[kGroupCount] = { HashRng,    HashRace,     HashPlayers, HashControllers, HashObjects,
+                                              HashActors, HashOObjects, HashCameras, HashRaceArrays,  HashWorld };
     GroupHashes out{};
     for (int g = 0; g < kGroupCount; g++) {
         Hasher h(sink);
@@ -220,6 +235,67 @@ GroupHashes oracle::HashState(FieldSink* sink) {
     sLastCost.footprint[kObjects] = sizeof(objectListSize) + sizeof(gObjectList);
     sLastCost.footprint[kCameras] = sizeof(cameras);
     return out;
+}
+
+// Pointer rules (OracleCoverage.h): what a pointer NAMES, never its address. A target outside the array it must point
+// into is a hasher bug or memory corruption — Oracle_Abort, never a guess.
+void oracle::PutPlayerPtr(Hasher& h, const char* n, const Player* p, const char* what) {
+    int32_t idx = -1;
+    if (p != nullptr) {
+        const ptrdiff_t d = p - gPlayers;
+        if (d < 0 || d >= NUM_PLAYERS) {
+            Oracle_Abort((std::string("state hash: ") + what + " points outside gPlayers[0..8)").c_str());
+        }
+        idx = (int32_t) d;
+    }
+    put(h, n, idx);
+}
+
+void oracle::PutCameraPtr(Hasher& h, const char* n, const Camera* c, const char* what) {
+    int32_t idx = -1;
+    if (c != nullptr) {
+        const ptrdiff_t d = c - cameras;
+        if (d < 0 || d >= NUM_CAMERAS) {
+            Oracle_Abort((std::string("state hash: ") + what + " points outside cameras[0..16)").c_str());
+        }
+        idx = (int32_t) d;
+    }
+    put(h, n, idx);
+}
+
+void oracle::PutScreenPtr(Hasher& h, const char* n, const ScreenContext* s, const char* what) {
+    constexpr ptrdiff_t kScreens = sizeof(gScreenContexts) / sizeof(gScreenContexts[0]);
+    int32_t idx = -1;
+    if (s != nullptr) {
+        const ptrdiff_t d = s - gScreenContexts;
+        if (d < 0 || d >= kScreens) {
+            Oracle_Abort((std::string("state hash: ") + what + " points outside gScreenContexts").c_str());
+        }
+        idx = (int32_t) d;
+    }
+    put(h, n, idx);
+}
+
+void oracle::PutObjectPtr(Hasher& h, const char* n, const OObject* o) {
+    put(h, n, o != nullptr ? o->_objectIndex : -2); // the MoleGroup precedent (FASE 1.4)
+}
+
+void oracle::PutEmitterPtr(Hasher& h, const char* n, const ParticleEmitter* e, const char* what) {
+    int32_t idx = -1;
+    if (e != nullptr) {
+        const World* w = GetWorld();
+        if (w != nullptr) {
+            for (size_t i = 0; i < w->Emitters.size(); i++) {
+                if (w->Emitters[i].get() == e) {
+                    idx = (int32_t) i;
+                }
+            }
+        }
+        if (idx < 0) {
+            Oracle_Abort((std::string("state hash: ") + what + " points at no World::Emitters entry").c_str());
+        }
+    }
+    put(h, n, idx);
 }
 
 HashCost oracle::LastHashCost() {

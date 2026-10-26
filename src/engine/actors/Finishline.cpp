@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include "engine/CoreMath.h"
 
@@ -106,4 +107,24 @@ void AFinishline::Collision(Player* player, AActor* actor) {
 
 bool AFinishline::IsMod() {
     return true;
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void AFinishline::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "bIsFinishline", bIsFinishline);
+    put(h, "_idx", (uint64_t) _idx);
+    put(h, "PickedUp", PickedUp);
+    put(h, "Timer", Timer);
+    oracle::PutPlayerPtr(h, "_player", _player, "AFinishline::_player");
+    put(h, "Hop", Hop);
+    put(h, "Gravity", Gravity);
+    put(h, "OldHop", OldHop);
+    put(h, "OldGravity", OldGravity);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void AFinishline::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

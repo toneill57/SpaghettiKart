@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 
 #include "Cloud.h"
 #include "engine/Actor.h"
@@ -209,4 +210,17 @@ void ACloud::DrawEditorProperties() {
     if (ImGui::Button(ICON_FA_UNDO "##ResetSpeedB")) {
         Gravity = 0.0f;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void ACloud::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "PickedUp", PickedUp);
+    put(h, "TimerLength", TimerLength);
+    put(h, "Timer", Timer);
+    oracle::PutPlayerPtr(h, "_player", _player, "ACloud::_player");
+    put(h, "Hop", Hop);
+    put(h, "Gravity", Gravity);
+    put(h, "OldHop", OldHop);
+    put(h, "OldGravity", OldGravity);
 }

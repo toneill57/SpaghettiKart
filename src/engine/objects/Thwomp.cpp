@@ -1585,8 +1585,9 @@ void OThwomp::DrawEditorProperties() {
     }
 }
 
-// MK64 Online FASE 1.4: the oracle hashes the private state that gObjectList does not carry, including the two statics
-// every Thwomp shares (_rand and the hoisted sThwompTempS7).
+// MK64 Online FASE 1.4: the oracle hashes the private state that gObjectList does not carry. The two statics every
+// Thwomp shares (_rand and the hoisted sThwompTempS7) moved to HashStatics in FASE 1.4b: hashed once per iteration, and
+// still hashed when no Thwomp is alive.
 void OThwomp::HashState(oracle::Hasher& h) const {
     using oracle::put;
     put(h, "BoundingBoxSize", BoundingBoxSize);
@@ -1594,6 +1595,12 @@ void OThwomp::HashState(oracle::Hasher& h) const {
     put(h, "PrimAlpha", PrimAlpha);
     put(h, "_idx", _idx);
     put(h, "_faceDirection", _faceDirection);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OThwomp::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
     put(h, "_rand", (uint64_t) _rand);
-    put(h, "temp_s7", sThwompTempS7);
+    put(h, "temp_s7", sThwompTempS7); // the hoisted function-static (FASE 1.4), shared by every Thwomp
 }

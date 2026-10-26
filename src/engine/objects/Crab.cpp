@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include "Crab.h"
 #include <vector>
@@ -210,4 +211,18 @@ void OCrab::DrawEditorProperties() {
         gObjectList[_objectIndex].unk_01C[0] = _end.x * xOrientation;
         gObjectList[_objectIndex].unk_01C[2] = _end.z;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OCrab::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_start", _start);
+    put(h, "_end", _end);
+    put(h, "_idx", _idx);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OCrab::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

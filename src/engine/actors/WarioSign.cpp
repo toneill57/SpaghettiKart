@@ -1,4 +1,5 @@
 #include "WarioSign.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 
 #include <libultra/gbi.h>
 #include <assets/models/tracks/wario_stadium/wario_stadium_data.h>
@@ -70,4 +71,16 @@ void AWarioSign::Draw(Camera *camera) {
         }
         FrameInterpolation_RecordCloseChild();
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void AWarioSign::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_idx", (uint64_t) _idx);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void AWarioSign::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

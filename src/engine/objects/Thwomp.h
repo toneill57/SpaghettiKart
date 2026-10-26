@@ -134,4 +134,7 @@ private:
     s16 _faceDirection;
     //! @todo Write this better. This effects the squish size and the bounding box size.
     // We should probably return to the programmer the pointer to the actor so they can do thwomp->squishSize = value.
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    static void HashStatics(oracle::Hasher& h);
 };

@@ -84,8 +84,13 @@ void OMoleGroup::HashState(oracle::Hasher& h) const {
     for (size_t i = 0; i < _moles.size(); i++) {
         oracle::Hasher::Scope e(h, i);
         const MoleEntry& m = _moles[i];
-        put(h, "mole", m.Mole != nullptr ? m.Mole->_objectIndex : -2); // the OMole by its slot, never its address
+        oracle::PutObjectPtr(h, "Mole", m.Mole); // the OMole by its slot, never its address (FASE 1.4b: the shared helper)
         put(h, "Pos", m.Pos);
         put(h, "Active", m.Active);
     }
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OMoleGroup::HashStatics(oracle::Hasher& h) {
+    oracle::put(h, "_count", (uint64_t) _count);
 }

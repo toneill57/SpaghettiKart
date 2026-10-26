@@ -86,4 +86,7 @@ private:
     s32 mPlayerId;
     s32 mCameraId;
     s32 mLakituId;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    static void HashStatics(oracle::Hasher& h);
 };

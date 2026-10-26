@@ -1,4 +1,5 @@
 #include "SpaghettiShip.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 
 #include <libultra/gbi.h>
 #include "engine/Matrix.h"
@@ -28,8 +29,12 @@ ASpaghettiShip::ASpaghettiShip(const SpawnParams& params) : AActor(params) {
     Rot[2] = rot.roll;
 }
 
+// MK64 Online FASE 1.4b: was `static float angle` inside ASpaghettiShip::Tick — hoisted (pure rename, same zero initial
+// value) so the oracle can hash it. Shared by every instance, exactly as the function-static was.
+static float sSpaghettiShipAngle = 0.0f; // Keeps track of the ship's rotation around the circle
+
 void ASpaghettiShip::Tick() {
-    static float angle = 0.0f; // Keeps track of the ship's rotation around the circle
+    float& angle = sSpaghettiShipAngle;
     float radius = 150.0f;      // The radius of the circular path
     float speed = 0.01f;       // Speed of rotation
 
@@ -88,3 +93,14 @@ void ASpaghettiShip::Draw(Camera *camera) {
 }
 
 bool ASpaghettiShip::IsMod() { return true; }
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void ASpaghettiShip::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "WheelRot", WheelRot);
+}
+
+// MK64 Online FASE 1.4b: the oracle hashes the class statics, once per iteration (World::HashState).
+void ASpaghettiShip::HashStatics(oracle::Hasher& h) {
+    oracle::put(h, "angle", sSpaghettiShipAngle); // the hoisted function-static
+}

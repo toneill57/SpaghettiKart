@@ -7,6 +7,10 @@
 
 #ifdef __cplusplus
 #include <vector>
+
+namespace oracle { // MK64 Online FASE 1.4b
+class Hasher;
+}
 /**
  * Allows exploring tracks in the menus 
  */
@@ -182,6 +186,9 @@ public:
         }
         return mTracks[trackIndex]->MinimapTexture;
     }
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const;
 };
 
 #endif // __cplusplus

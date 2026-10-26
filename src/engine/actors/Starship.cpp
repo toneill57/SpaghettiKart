@@ -1,4 +1,5 @@
 #include "Starship.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 
 #include <libultra/gbi.h>
 #include "engine/Matrix.h"
@@ -40,8 +41,12 @@ void AStarship::BeginPlay() {
     }
 }
 
+// MK64 Online FASE 1.4b: was `static float angle` inside AStarship::Tick — hoisted (pure rename, same zero initial value)
+// so the oracle can hash it. Shared by every instance, exactly as the function-static was.
+static float sStarshipAngle = 0.0f;
+
 void AStarship::Tick() {
-    static float angle = 0.0f;
+    float& angle = sStarshipAngle;
 
     angle += Speed;
 
@@ -145,4 +150,15 @@ void AStarship::DrawEditorProperties() {
     if (ImGui::Button(ICON_FA_UNDO "##ResetSpeedB")) {
         SpeedB = 0.0f;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void AStarship::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "SpeedB", SpeedB);
+}
+
+// MK64 Online FASE 1.4b: the oracle hashes the class statics, once per iteration (World::HashState).
+void AStarship::HashStatics(oracle::Hasher& h) {
+    oracle::put(h, "angle", sStarshipAngle); // the hoisted function-static
 }

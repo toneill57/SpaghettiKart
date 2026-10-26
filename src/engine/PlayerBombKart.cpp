@@ -1,4 +1,5 @@
 #include "PlayerBombKart.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "Matrix.h"
 #include "port/interpolation/FrameInterpolation.h"
 
@@ -140,4 +141,21 @@ void PlayerBombKart::LoadMtx(s32 cameraId) { // func_800568A0
     AddHudMatrix(mtx, G_MTX_LOAD | G_MTX_NOPUSH | G_MTX_MODELVIEW);
     gSPDisplayList(gDisplayListHead++, (Gfx*) D_0D007B98);
     FrameInterpolation_RecordCloseChild();
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void PlayerBombKart::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "state", state);
+    put(h, "pos", pos);
+    put(h, "surfaceHeight", surfaceHeight);
+    put(h, "_primAlpha", _primAlpha);
+    put(h, "_idx", (uint64_t) _idx);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void PlayerBombKart::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "vec", vec);
+    put(h, "_count", (uint64_t) _count);
 }

@@ -1,4 +1,5 @@
 #include "Cup.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "tracks/Track.h"
 #include "port/Game.h"
 
@@ -63,4 +64,12 @@ void Cup::ValidateTrackIds(const Registry<TrackInfo>& registry) const {
         }
         throw std::invalid_argument(errorMsg);
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void Cup::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "Id", Id);
+    put(h, "CursorPosition", (uint64_t) CursorPosition);
+    put(h, "mTracks", mTracks);
 }

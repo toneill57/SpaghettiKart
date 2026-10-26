@@ -1,4 +1,6 @@
 #include "RaceManager.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
+#include "port/oracle/OracleState.h"    // MK64 Online FASE 1.4b: Oracle_Abort
 
 #include "AllActors.h"
 #include "World.h"
@@ -188,4 +190,35 @@ extern "C" int16_t RaceManager_GetRandomCPUItem(uint32_t rank) {
     }
 
     return table->Roll(rank);
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void RaceManager::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    // table-key: the two active tables by the key that names them in mItemTables ("" = null, abort if unnamed).
+    auto key = [&](const RandomItemTable* t, const char* what) -> std::string {
+        if (t == nullptr) {
+            return "";
+        }
+        for (const auto& kv : mItemTables) {
+            if (&kv.second == t) {
+                return kv.first;
+            }
+        }
+        Oracle_Abort((std::string("state hash: RaceManager::") + what + " points at no mItemTables entry").c_str());
+    };
+    put(h, "mHumanItemTable", key(mHumanItemTable, "mHumanItemTable"));
+    put(h, "mCPUItemTable", key(mCPUItemTable, "mCPUItemTable"));
+    std::vector<const std::string*> keys; // SORTED, never the unordered_map's iteration order
+    for (const auto& kv : mItemTables) {
+        keys.push_back(&kv.first);
+    }
+    std::sort(keys.begin(), keys.end(), [](const std::string* a, const std::string* b) { return *a < *b; });
+    oracle::Hasher::Scope s(h, "mItemTables");
+    put(h, "size", (uint64_t) keys.size());
+    for (size_t i = 0; i < keys.size(); i++) {
+        oracle::Hasher::Scope e(h, i);
+        put(h, "key", *keys[i]);
+        mItemTables.at(*keys[i]).HashState(h);
+    }
 }

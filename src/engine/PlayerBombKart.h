@@ -3,6 +3,10 @@
 #include <libultraship.h>
 #include "CoreMath.h"
 
+namespace oracle { // MK64 Online FASE 1.4b
+class Hasher;
+}
+
 class PlayerBombKart {
 public:
 
@@ -35,4 +39,8 @@ private:
     static u32 vec[3][3];
     static size_t _count;
     size_t _idx;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    virtual void HashState(oracle::Hasher& h) const;
+    static void HashStatics(oracle::Hasher& h);
 };

@@ -9,6 +9,10 @@ extern "C" {
 #include "code_800029B0.h"
 }
 
+namespace oracle { // MK64 Online FASE 1.4b
+class Hasher;
+}
+
 /**
  * SkyActor base class
  *
@@ -43,4 +47,7 @@ protected:
     s16 mUnk210;
     f32 mUnk1E8;
     s16 mUnk218;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    virtual void HashState(oracle::Hasher& h) const;
 };

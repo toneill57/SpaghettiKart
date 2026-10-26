@@ -11,6 +11,10 @@ extern "C" {
 #include "common_structs.h"
 }
 
+namespace oracle {
+class Hasher;
+}
+
 class AActor {
 public:
     /* 0x00 */ s16 Type = 0;
@@ -70,4 +74,6 @@ public:
     void Rotate(IRotator rot);
     void SetScale(FVector scale);
     virtual void DrawEditorProperties() { DrawDefaultEditorProperties(); };
+    // MK64 Online FASE 1.4b: subclass simulation state the oracle hashes beyond the base fields (no-op by default).
+    virtual void HashState(oracle::Hasher&) const {}
 };

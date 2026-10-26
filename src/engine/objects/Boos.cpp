@@ -360,3 +360,8 @@ void OBoos::HashState(oracle::Hasher& h) const {
         put(h, "", _indices[i]);
     }
 }
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OBoos::HashStatics(oracle::Hasher& h) {
+    oracle::put(h, "_count", (uint64_t) _count);
+}

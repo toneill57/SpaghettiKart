@@ -1,4 +1,5 @@
 #include "RandomItemTable.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "defines.h"
 #include "port/Game.h"
 
@@ -102,4 +103,25 @@ bool RandomItemTable::IsBlacklisted(uint32_t itemId) const {
 
 void RandomItemTable::ClearBlacklist() {
     mBlacklist.clear();
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void RandomItemTable::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "mDistanceEnabled", mDistanceEnabled);
+    {
+        oracle::Hasher::Scope s(h, "mTable");
+        put(h, "size", (uint64_t) mTable.size());
+        for (size_t rank = 0; rank < mTable.size(); rank++) {
+            oracle::Hasher::Scope r(h, rank);
+            put(h, "size", (uint64_t) mTable[rank].size());
+            for (size_t i = 0; i < mTable[rank].size(); i++) {
+                oracle::Hasher::Scope e(h, i);
+                put(h, "Id", mTable[rank][i].Id);
+                put(h, "Weight", mTable[rank][i].Weight);
+                put(h, "Distance", mTable[rank][i].Distance);
+            }
+        }
+    }
+    put(h, "mBlacklist", mBlacklist); // sorted (an unordered_set's order is not state)
 }
