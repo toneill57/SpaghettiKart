@@ -2206,6 +2206,16 @@ static void test_subclass_coverage() {
         }
     };
     checkRows(oracle::kHashed, std::size(oracle::kHashed));
+    for (const oracle::CoverageRow& r : oracle::kHashed) { // every rule is a documented one
+        bool known = std::strncmp(r.rule, "group:", 6) == 0;
+        for (const char* k : oracle::kRules) {
+            known = known || std::strcmp(r.rule, k) == 0;
+        }
+        if (!known) {
+            std::fprintf(stderr, "  %s::%s: rule \"%s\" is not in kRules\n", r.cls, r.member, r.rule);
+        }
+        CHECK(known);
+    }
     checkRows(oracle::kExcluded, std::size(oracle::kExcluded));
     for (const std::string& c : outOfScope) {
         bool defined = false;

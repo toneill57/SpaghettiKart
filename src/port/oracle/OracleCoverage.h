@@ -17,10 +17,12 @@
 //   object-ptr  the target OObject's _objectIndex (or AActor's deque index), -2 for null (OMoleGroup precedent)
 //   emitter-ptr the target's index in World::Emitters, -1 for null
 //   camera-ptr  the index in cameras[] (src/camera.c), -1 for null
+//   screen-ptr  the index in gScreenContexts[] (src/code_800029B0.c), -1 for null
 //   flag-ptr    which target (a small enum: own member / a named global / other), then the POINTED value when the
 //               target is known memory
 //   table-key   the name that registers the pointed table in its registry (gItemTableRegistry), then the table itself
 //   cup-ptr     the index in World::Cups, -1 for null
+//   owned       a unique_ptr / shared_ptr member: whether it is set, then the owned object's own HashState
 //   group:<g>   hashed by another group's walk (named), e.g. World::Actors by `actors`
 //   statics     a class static: hashed ONCE per iteration by the class's HashStatics(), called from the `world` group
 // Exclusions (kExcluded) carry their reason in the same column. A render-only reason cites the lines that prove no
@@ -47,6 +49,12 @@ inline constexpr const char kNoReaderOrWriter[] =
     "no reader or writer anywhere (rg '\\buuid\\b' src: the two declarations only)";
 inline constexpr const char kDeadVehicleType[] =
     "dead: never written or read (rg: the declaration only; the spawn mode lives in SpawnType)";
+
+// The rule names above; oracle_tests refuses a kHashed row whose rule is not one of them (or a group:<g>).
+inline constexpr const char* kRules[] = { "scalar",     "size_t",      "vector",     "string",    "optional",
+                                          "map-sorted", "player-ptr",  "object-ptr", "emitter-ptr", "camera-ptr",
+                                          "screen-ptr", "flag-ptr",    "table-key",  "cup-ptr",   "owned",
+                                          "statics" };
 
 struct CoverageRow {
     const char* cls;    // as declared; nested types qualified ("OMoleGroup::MoleEntry")
