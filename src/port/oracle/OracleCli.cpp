@@ -81,6 +81,12 @@ int Oracle_ParseArgsInto(int argc, char** argv, OracleConfig& cfg) {
                 return Usage(a + " needs a decimal iteration >= 1");
             }
             cfg.probeTickAt = (int32_t) n;
+        } else if (a == "--oracle-probe-straddle") { // FASE 1.4.5 probe 1
+            cfg.probeStraddle = true;
+        } else if (a == "--oracle-probe-audio-serial") {
+            cfg.probeAudioSerial = true;
+        } else if (a == "--oracle-probe-selftest") {
+            cfg.probeSelftest = true;
         } else if (a == "--oracle-info") { // no window
             if (!need()) {
                 return Usage(a + " needs a value");
@@ -102,8 +108,9 @@ int Oracle_ParseArgsInto(int argc, char** argv, OracleConfig& cfg) {
         }
     }
     const int noWindowModes = (infoPath != nullptr ? 1 : 0) + (verifyA != nullptr ? 1 : 0);
-    if (noWindowModes > 1 || (noWindowModes == 1 && cfg.mode != OracleMode::Off)) {
-        return Usage("--oracle-info / --oracle-verify run alone (no window, no --oracle-record / --oracle-replay)");
+    const bool anyProbe = cfg.probeTickAt >= 0 || cfg.probeStraddle || cfg.probeAudioSerial || cfg.probeSelftest;
+    if (noWindowModes > 1 || (noWindowModes == 1 && (cfg.mode != OracleMode::Off || anyProbe))) {
+        return Usage("--oracle-info / --oracle-verify run alone (no window, no --oracle-record / --oracle-replay, no probe)");
     }
     if (infoPath != nullptr) {
         return Oracle_PrintInfo(infoPath);
@@ -113,6 +120,15 @@ int Oracle_ParseArgsInto(int argc, char** argv, OracleConfig& cfg) {
     }
     if (cfg.probeTickAt >= 0 && cfg.mode != OracleMode::Replay) {
         return Usage("--oracle-probe-tick-at is refused unless --oracle-replay (never in a recording)");
+    }
+    if ((cfg.probeStraddle || cfg.probeAudioSerial || cfg.probeSelftest) && cfg.mode == OracleMode::Off) {
+        return Usage("--oracle-probe-straddle / -audio-serial / -selftest need --oracle-record or --oracle-replay");
+    }
+    if (cfg.probeSelftest && cfg.mode == OracleMode::Record) {
+        return Usage("--oracle-probe-selftest is refused in a recording (it writes gRandomSeed16, even if it restores it)");
+    }
+    if (cfg.probeSelftest && !cfg.probeStraddle) {
+        return Usage("--oracle-probe-selftest is the control of --oracle-probe-straddle: pass both");
     }
     if (cfg.mode != OracleMode::Off && cfg.hashLogPath.empty()) {
         cfg.hashLogPath = (cfg.mode == OracleMode::Record ? cfg.recordPath : cfg.replayPath) + ".mk64hash";

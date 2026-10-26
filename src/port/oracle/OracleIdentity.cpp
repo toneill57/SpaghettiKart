@@ -4,6 +4,7 @@
 #include "OracleRecording.h"
 #include "OracleHash.h"
 #include "OracleFpEnv.h"
+#include "OracleStateHash.h" // ConfigHash, ModListHash (FASE 1.4)
 
 #include <cstring>
 #include <fstream>
@@ -80,8 +81,11 @@ oracle::Header oracle::MakeHeader(int32_t tickLogic, uint16_t seed, IdentityProb
     h.tickLogic = tickLogic;
     h.skipIntro = CVarGetInteger("gSkipIntro", 0);
     h.seed = seed;
+    size_t modListEntries = 0;
+    h.configHash = oracle::ConfigHash();                   // FASE 1.4.5 probe 2 (T3 P11)
+    h.modListHash = oracle::ModListHash(&modListEntries); // FASE 1.4.5 probes 3-4 (T3 P13/P14)
     if (probe != nullptr) {
-        *probe = IdentityProbe{ gamePath, portPath, binaryPath };
+        *probe = IdentityProbe{ gamePath, portPath, binaryPath, modListEntries };
     }
     return h;
 }

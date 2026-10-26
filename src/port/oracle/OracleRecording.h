@@ -38,8 +38,8 @@ struct Header {
     uint64_t gameArchiveHash; // FNV-1a-64 of mk64.o2r
     uint64_t portArchiveHash; // FNV-1a-64 of spaghetti.o2r
     uint64_t binaryHash;      // FNV-1a-64 of the running executable — INFORMATIONAL in Fase 1, enforced by Fase 3
-    uint64_t modListHash;     // FASE 1.4 (0 until then)
-    uint64_t configHash;      // FASE 1.4 (0 until then)
+    uint64_t modListHash;     // FASE 1.4: mod load order + registry ids (OracleIdentityHash.h HashModList)
+    uint64_t configHash;      // FASE 1.4: the simulation-relevant CVars (OracleIdentityHash.h kSimCVars)
     uint64_t fpWord;          // Oracle_ReadFpEnvWord() (FASE 1.1)
     int32_t tickLogic;        // pinned 2 (FASE 1.2)
     int32_t skipIntro;        // CVar gSkipIntro at launch
@@ -95,6 +95,7 @@ struct IdentityProbe {
     std::string gameArchivePath;
     std::string portArchivePath;
     std::string binaryPath;
+    size_t modListEntries = 0; // FASE 1.4: mods + registry entries behind modListHash (positive control: > 0)
 };
 
 // The run's build identity (OracleIdentity.cpp — game target only: it needs libultraship's Context and CVars).

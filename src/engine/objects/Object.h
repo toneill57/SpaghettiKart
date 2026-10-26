@@ -11,6 +11,10 @@ extern "C" {
     #include "objects.h"
 }
 
+namespace oracle {
+class Hasher;
+}
+
 class OObject {
 public:
     uint8_t uuid[16];
@@ -46,4 +50,6 @@ public:
     void Rotate(IRotator rot);
     void SetScale(FVector scale);
     virtual void DrawEditorProperties() { DrawDefaultEditorProperties(); };
+    // MK64 Online FASE 1.4: subclass simulation state the oracle hashes beyond the base fields (no-op by default).
+    virtual void HashState(oracle::Hasher&) const {}
 };

@@ -1,4 +1,5 @@
 #include "Boos.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4: oracle state hash
 #include "engine/World.h"
 #include "engine/CoreMath.h"
 #include "port/interpolation/FrameInterpolation.h"
@@ -338,5 +339,24 @@ void OBoos::DrawEditorProperties() {
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_UNDO "##ResetRightExitSpan")) {
         RightTrigger = IPathSpan(0, 0);
+    }
+}
+
+// MK64 Online FASE 1.4: the oracle hashes the private state that gObjectList does not carry.
+void OBoos::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "LeftTrigger", LeftTrigger);
+    put(h, "ActiveZone", ActiveZone);
+    put(h, "RightTrigger", RightTrigger);
+    put(h, "_pos", _pos);
+    put(h, "_idx", (uint64_t) _idx);
+    put(h, "_numBoos", (uint64_t) _numBoos);
+    put(h, "_isActive", _isActive);
+    put(h, "_playerId", _playerId);
+    put(h, "_indices.size", (uint64_t) _indices.size());
+    oracle::Hasher::Scope s(h, "_indices");
+    for (size_t i = 0; i < _indices.size(); i++) {
+        oracle::Hasher::Scope e(h, i);
+        put(h, "", _indices[i]);
     }
 }
