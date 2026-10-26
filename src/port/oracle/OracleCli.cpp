@@ -108,8 +108,9 @@ int Oracle_ParseArgsInto(int argc, char** argv, OracleConfig& cfg) {
         }
     }
     const int noWindowModes = (infoPath != nullptr ? 1 : 0) + (verifyA != nullptr ? 1 : 0);
-    if (noWindowModes > 1 || (noWindowModes == 1 && cfg.mode != OracleMode::Off)) {
-        return Usage("--oracle-info / --oracle-verify run alone (no window, no --oracle-record / --oracle-replay)");
+    const bool anyProbe = cfg.probeTickAt >= 0 || cfg.probeStraddle || cfg.probeAudioSerial || cfg.probeSelftest;
+    if (noWindowModes > 1 || (noWindowModes == 1 && (cfg.mode != OracleMode::Off || anyProbe))) {
+        return Usage("--oracle-info / --oracle-verify run alone (no window, no --oracle-record / --oracle-replay, no probe)");
     }
     if (infoPath != nullptr) {
         return Oracle_PrintInfo(infoPath);

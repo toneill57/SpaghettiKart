@@ -974,4 +974,13 @@ static void test_cli_probe_flags() {
     // Flags take no value: the next token is parsed on its own.
     CHECK(Parse({ "--oracle-probe-straddle", "--oracle-record", "x" }, cfg) == -1 && cfg.probeStraddle &&
           cfg.mode == OracleMode::Record);
+    // A probe next to a no-window mode is refused, never silently ignored (same rule as 1.3's review fix 6), including
+    // 1.3's --oracle-probe-tick-at.
+    const auto rec = TempPath("cli-probe-info.mk64rec");
+    CHECK(WriteSample(rec, 2, false, true));
+    CHECK(Parse({ "--oracle-info", rec.string() }, cfg) == 0); // control: the info itself is fine
+    CHECK(Parse({ "--oracle-info", rec.string(), "--oracle-probe-straddle" }, cfg) == 2);
+    CHECK(Parse({ "--oracle-info", rec.string(), "--oracle-probe-audio-serial" }, cfg) == 2);
+    CHECK(Parse({ "--oracle-info", rec.string(), "--oracle-probe-tick-at", "5" }, cfg) == 2);
+    CHECK(Parse({ "--oracle-verify", "a", "b", "--oracle-probe-straddle" }, cfg) == 2);
 }
