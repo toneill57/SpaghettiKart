@@ -1,5 +1,5 @@
-// The ONE walk over the simulation state (FASE 1.4.2): ten groups + `all`, field by field (`world`: FASE 1.4b). Game target
-// only. What each class contributes, member by member, is OracleCoverage.h (oracle_tests enforces it).
+// The ONE walk over the simulation state (FASE 1.4.2): ten groups + `all`, field by field (`world`: FASE 1.4b). Game
+// target only. What each class contributes, member by member, is OracleCoverage.h (oracle_tests enforces it).
 #include <libultraship.h>
 
 #include "OracleStatePut.h"
@@ -133,8 +133,8 @@ void HashActors(Hasher& h) {
         put(h, "Scale", a.Scale);
         put(h, "Speed", a.Speed);
         put(h, "bPendingDestroy", a.bPendingDestroy);
-        // FASE 1.4b: subclass state. Under its own path segment: ATree re-declares Flags / State / BoundingBoxSize / Unk_08,
-        // so the base's and the subclass's members would otherwise share a dump path.
+        // FASE 1.4b: subclass state. Under its own path segment: ATree re-declares Flags / State / BoundingBoxSize /
+        // Unk_08, so the base's and the subclass's members would otherwise share a dump path.
         Hasher::Scope sub(h, "sub");
         a.HashState(h);
     }

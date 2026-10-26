@@ -4,7 +4,8 @@
 // the clang record-layout dump comparison). Never a whole struct as raw memory: padding, vptrs and pointers would make two
 // peers with identical simulation state hash differently.
 #include "OracleHash.h"
-#include "engine/CoreMath.h" // FVector (x,y,z), IRotator (pitch,yaw,roll), IPathSpan (Start,End), FVector2D, IVector2D, RGBA8
+// FVector (x,y,z), IRotator (pitch,yaw,roll), IPathSpan (Start,End); FASE 1.4b: FVector2D, IVector2D, RGBA8
+#include "engine/CoreMath.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -83,17 +84,20 @@ class ParticleEmitter;
 #define ORACLE_FVECTOR_FIELDS(X) X(x) X(y) X(z)
 #define ORACLE_IROTATOR_FIELDS(X) X(pitch) X(yaw) X(roll)
 #define ORACLE_IPATHSPAN_FIELDS(X) X(Start) X(End)
-// FASE 1.4b — the POD member types of the classes in OracleCoverage.h. Each list is checked against the compiler's record
-// layout by implement/fase-1-artifacts/1.4b/inventory.py (the 1.4 field-coverage method). The parameter is F, not X:
-// IVector2D has a member named X.
+// FASE 1.4b — the POD member types of the classes in OracleCoverage.h. Each list is checked against the compiler's
+// record layout by implement/fase-1-artifacts/1.4b/inventory.py (the 1.4 field-coverage method). The parameter is F,
+// not X: IVector2D has a member named X.
 #define ORACLE_FVECTOR2D_FIELDS(F) F(x) F(z)
 #define ORACLE_IVECTOR2D_FIELDS(F) F(X) F(Y)
 #define ORACLE_RGBA8_FIELDS(F) F(r) F(g) F(b) F(a)
-#define ORACLE_RGB8_FIELDS(F) F(r) F(g) F(b)                                   // include/common_structs.h
+#define ORACLE_RGB8_FIELDS(F) F(r) F(g) F(b) // include/common_structs.h
+// include/vehicles.h
 #define ORACLE_TRAINCARSTUFF_FIELDS(F) \
-    F(isActive) F(compilerPadding) F(position) F(velocity) F(waypointIndex) F(actorIndex) F(unused) // include/vehicles.h
-#define ORACLE_TRACKPATHSIZES_FIELDS(F) F(unk0) F(unk2) F(unk4) F(unk6) F(unk8) F(padA) // src/data/path_spawn_metadata.h
-#define ORACLE_VTX_T_FIELDS(F) F(ob) F(flag) F(tc) F(cn)                       // libultraship gbi.h (Vtx = union { Vtx_t v; … })
+    F(isActive) F(compilerPadding) F(position) F(velocity) F(waypointIndex) F(actorIndex) F(unused)
+// src/data/path_spawn_metadata.h
+#define ORACLE_TRACKPATHSIZES_FIELDS(F) F(unk0) F(unk2) F(unk4) F(unk6) F(unk8) F(padA)
+// libultraship gbi.h (Vtx = union { Vtx_t v; … })
+#define ORACLE_VTX_T_FIELDS(F) F(ob) F(flag) F(tc) F(cn)
 
 namespace oracle {
 
@@ -117,7 +121,8 @@ ORACLE_STRUCT(TrainCarStuff, ORACLE_TRAINCARSTUFF_FIELDS)
 ORACLE_STRUCT(TrackPathSizes, ORACLE_TRACKPATHSIZES_FIELDS)
 ORACLE_STRUCT(Vtx_t, ORACLE_VTX_T_FIELDS)
 
-inline void put(Hasher& h, const char* n, const Vtx& s) { // the colour view: every Vtx this hash reaches is built as Vtx_t
+// The colour view: every Vtx this hash reaches is built as Vtx_t.
+inline void put(Hasher& h, const char* n, const Vtx& s) {
     put(h, n, s.v);
 }
 

@@ -141,8 +141,8 @@ extern "C" const char* TrackBrowser_GetMinimapTextureByIdx(size_t trackIndex) {
 }
 
 // MK64 Online FASE 1.4b: the oracle hashes the browser's menu state. mTracks is the registry's track list sorted by id
-// (identity: modListHash); sCurrentlySelectedTrack gates TrackBrowser_SetTrackFromCup, and SetTrack re-invokes the track
-// registry — not idempotent, so the cache is state.
+// (identity: modListHash); sCurrentlySelectedTrack gates TrackBrowser_SetTrackFromCup, and SetTrack re-invokes the
+// track registry — not idempotent, so the cache is state.
 void TrackBrowser::HashState(oracle::Hasher& h) const {
     using oracle::put;
     put(h, "mTrackIndex", (uint64_t) mTrackIndex);

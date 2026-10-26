@@ -774,8 +774,9 @@ oracle::ModListInput SampleModList() {
 
 static void test_mod_list_hash() {
     const uint64_t base = oracle::HashModList(SampleModList());
-    // FASE 1.4b.5 known answer, computed independently (implement/fase-1-artifacts/1.4b/kat.py: python3 FNV-1a-64 over the
-    // documented layout) — pins the formula itself (tower mutant T07, sort by name only, survived 1.4's property tests).
+    // FASE 1.4b.5 known answer, computed independently (implement/fase-1-artifacts/1.4b/kat.py: python3 FNV-1a-64 over
+    // the documented layout) — pins the formula itself (tower mutant T07, sort by name only, survived 1.4's property
+    // tests).
     CHECK(base == 0x137c2a11f7c131f4ull);
     // The registries' iteration order (unordered_map) is NOT identity: any insertion order gives the same value.
     {
@@ -828,8 +829,8 @@ static void test_config_hash() {
         return oracle::HashConfig(specs, v, 2);
     };
     const uint64_t base = hash(3, 1.5f);
-    // FASE 1.4b.5 known answer, computed independently (1.4b/kat.py) — pins the byte layout (tower mutant T06, the name's
-    // terminator dropped, survived 1.4's property tests).
+    // FASE 1.4b.5 known answer, computed independently (1.4b/kat.py) — pins the byte layout (tower mutant T06, the
+    // name's terminator dropped, survived 1.4's property tests).
     CHECK(base == 0x74d43566c974f4c2ull);
     CHECK(hash(3, 1.5f) == base);
     CHECK(hash(4, 1.5f) != base);
@@ -1430,8 +1431,9 @@ static void test_zip_content_hash() {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// FASE 1.4b — the coverage critic. The member list is re-derived FROM SOURCE TEXT (the class bodies of kCoverageHeaders),
-// as test_cvar_sweep re-runs the CVar sweep; the compiler's record layouts are the second method (1.4b/inventory.py).
+// FASE 1.4b — the coverage critic. The member list is re-derived FROM SOURCE TEXT (the class bodies of
+// kCoverageHeaders), as test_cvar_sweep re-runs the CVar sweep; the compiler's record layouts are the second method
+// (1.4b/inventory.py).
 
 namespace {
 
@@ -1448,8 +1450,9 @@ struct SrcClass {
     std::vector<std::string> bases;
 };
 
-// Comments and the CONTENTS of string / char literals become spaces (newlines kept, so line numbers stay true), and so do
-// preprocessor lines. Line comments end at the newline: `//[^\n]*`, never a dot-all `//.*` (that once ate a whole file).
+// Comments and the CONTENTS of string / char literals become spaces (newlines kept, so line numbers stay true), and so
+// do preprocessor lines. Line comments end at the newline: `//[^\n]*`, never a dot-all `//.*` (that once ate a whole
+// file).
 std::string StripSource(const std::string& s) {
     std::string o = s;
     const size_t n = o.size();
@@ -1657,8 +1660,8 @@ struct CoverageScan {
             isStatic = isStatic || w == "static";
         }
         if (isStatic) {
-            // static constexpr / static const T: not state. But `static const char* tbl[]` IS mutable — the const binds the
-            // pointee, so it only makes the object const when no '*' follows the last `const`.
+            // static constexpr / static const T: not state. But `static const char* tbl[]` IS mutable — the const binds
+            // the pointee, so it only makes the object const when no '*' follows the last `const`.
             size_t lastConst = std::string::npos;
             for (const std::string& w : words) {
                 if (w == "constexpr" || w == "consteval" || w == "constinit") {
@@ -1692,7 +1695,9 @@ struct CoverageScan {
                 d = d.substr(0, bracket);
             }
             const size_t colon = d.rfind(':');
-            if (colon != std::string::npos && colon > 0 && d[colon - 1] != ':' && (colon + 1 >= d.size() || d[colon + 1] != ':')) {
+            const bool bitField = colon != std::string::npos && colon > 0 && d[colon - 1] != ':' &&
+                                  (colon + 1 >= d.size() || d[colon + 1] != ':');
+            if (bitField) {
                 d = d.substr(0, colon); // bit-field width
             }
             const std::vector<std::string> ids = Idents(d);
@@ -1772,7 +1777,7 @@ struct CoverageScan {
                         }
                     }
                     if (name.empty()) {
-                        Scope(i + 1, close, cls); // an anonymous struct/union: its members belong to the enclosing class
+                        Scope(i + 1, close, cls); // anonymous struct/union: its members belong to the enclosing class
                         typeName.clear();
                     } else {
                         const std::string q = cls.empty() ? name : cls + "::" + name;
@@ -1782,7 +1787,8 @@ struct CoverageScan {
                     }
                     stmtIsType = !isTypedef;
                     stmtIsTypedef = isTypedef;
-                    stmt = "{}"; // what follows the body, up to ';', are declarators of the enclosing class (or the typedef name)
+                    // What follows the body, up to ';', are declarators of the enclosing class (or the typedef name).
+                    stmt = "{}";
                     i = close;
                     continue;
                 }
@@ -1863,8 +1869,8 @@ std::vector<SrcMember> ScanCppStatics(const std::string& raw, const std::string&
         if (p >= 2 && t[p - 1] == ':' && t[p - 2] == ':') {
             continue;
         }
-        // The statement: up to the first top-level ';' — a '{' after '=' is an initializer; a '{' after a top-level '(' is a
-        // function body (a static function: not a variable).
+        // The statement: up to the first top-level ';' — a '{' after '=' is an initializer; a '{' after a top-level '('
+        // is a function body (a static function: not a variable).
         std::string stmt;
         size_t i = p;
         bool function = false;
@@ -2008,12 +2014,13 @@ static void test_coverage_parser() {
     for (const SrcMember& m : s.members) {
         got.push_back(m.cls + "::" + m.member + (m.isStatic ? "(static)" : ""));
     }
-    const std::vector<std::string> want = { "ABase::a",        "ABase::b",           "ABase::myVtx",       "ABase::Pos",
-                                            "ABase::_count(static)", "ABase::kName(static)", "ABase::Name",   "ABase::Counts",      "ABase::cb",
-                                            "ABase::flags",    "ABase::mode",        "ABase::Entry::Mole", "ABase::Entry::Active",
-                                            "ABase::_entries", "ABase::crc",         "ABase::model",       "ABase::_player",
-                                            "ABase::Sequence", "Macroed::m", "CarStuff::isActive", "CarStuff::position",
-                                            "Inner::z" };
+    const std::vector<std::string> want = {
+        "ABase::a",           "ABase::b",           "ABase::myVtx",         "ABase::Pos",
+        "ABase::_count(static)", "ABase::kName(static)", "ABase::Name",     "ABase::Counts",
+        "ABase::cb",          "ABase::flags",       "ABase::mode",          "ABase::Entry::Mole",
+        "ABase::Entry::Active", "ABase::_entries",  "ABase::crc",           "ABase::model",
+        "ABase::_player",     "ABase::Sequence",    "Macroed::m",           "CarStuff::isActive",
+        "CarStuff::position", "Inner::z" };
     if (got != want) {
         std::fprintf(stderr, "  parser fixture members:");
         for (const std::string& g : got) {
@@ -2026,11 +2033,13 @@ static void test_coverage_parser() {
     for (const SrcClass& c : s.classes) {
         classes.push_back(c.name + (c.bases.empty() ? "" : ":" + c.bases[0]));
     }
-    CHECK((classes == std::vector<std::string>{ "ABase:AActor", "ABase::Entry", "Macroed", "CarStuff", "Inner:OObject" }));
+    const std::vector<std::string> wantClasses = { "ABase:AActor", "ABase::Entry", "Macroed", "CarStuff",
+                                                   "Inner:OObject" };
+    CHECK(classes == wantClasses);
     CHECK(s.members.size() == want.size() && s.members[0].where == "fixture.h:8");
 
-    // The .cpp statics sweep on its own fixture: file-scope, multi-line, brace-initialized and function-local statics are
-    // found; static functions, const / constexpr statics, static_cast / static_assert and comments are not.
+    // The .cpp statics sweep on its own fixture: file-scope, multi-line, brace-initialized and function-local statics
+    // are found; static functions, const / constexpr statics, static_cast / static_assert and comments are not.
     const char* cpp = R"FIX(
 static float sAngle = 0.0f;
 static Vtx sVtx[2] = {
@@ -2072,9 +2081,9 @@ struct CoverageSource {
     std::vector<SrcClass> classes;            // defined in kCoverageHeaders
     std::vector<SrcMember> members;           // of those classes
     std::vector<SrcClass> engineClasses;      // every class defined in any src/engine header (for root discovery)
-    std::vector<SrcMember> otherStatics;      // class statics of the classes NOT in kCoverageHeaders (src/engine, port/oracle)
-    std::vector<SrcMember> cppStatics;        // file-scope and function-local statics of src/engine + src/port/oracle .cpp
-    std::vector<std::pair<std::string, std::string>> code; // (raw, stripped) of every .cpp there: where the hashing lives
+    std::vector<SrcMember> otherStatics;      // class statics of classes NOT in kCoverageHeaders (engine, port/oracle)
+    std::vector<SrcMember> cppStatics;        // file-scope / function-local statics of src/engine + port/oracle .cpp
+    std::vector<std::pair<std::string, std::string>> code; // (raw, stripped) of each .cpp there: where hashing lives
     size_t files = 0;
 };
 
@@ -2148,7 +2157,8 @@ static void test_subclass_coverage() {
     }
     size_t subclasses = 0;
     for (const std::string& d : derived) {
-        if (std::find(std::begin(oracle::kCoverageRoots), std::end(oracle::kCoverageRoots), d) != std::end(oracle::kCoverageRoots)) {
+        const auto* rootsEnd = std::end(oracle::kCoverageRoots);
+        if (std::find(std::begin(oracle::kCoverageRoots), rootsEnd, d) != rootsEnd) {
             continue;
         }
         subclasses++;
@@ -2173,11 +2183,12 @@ static void test_subclass_coverage() {
             excluded += m.cls == r.cls && m.member == r.member;
         }
         if (hashed + excluded == 0 && ++unclassified <= 10) {
-            std::fprintf(stderr, "  unclassified %s::%s%s (%s)\n", m.cls.c_str(), m.member.c_str(), m.isStatic ? " [static]" : "",
-                         m.where.c_str());
+            std::fprintf(stderr, "  unclassified %s::%s%s (%s)\n", m.cls.c_str(), m.member.c_str(),
+                         m.isStatic ? " [static]" : "", m.where.c_str());
         }
         if (hashed + excluded > 1) {
-            std::fprintf(stderr, "  duplicated %s::%s (%d hashed, %d excluded)\n", m.cls.c_str(), m.member.c_str(), hashed, excluded);
+            std::fprintf(stderr, "  duplicated %s::%s (%d hashed, %d excluded)\n", m.cls.c_str(), m.member.c_str(),
+                         hashed, excluded);
         }
         CHECK(hashed + excluded == 1);
     }
@@ -2206,8 +2217,9 @@ static void test_subclass_coverage() {
         }
         CHECK(defined);
     }
-    // The code hashes what the table says: every kHashed row's name appears as a literal in its class's hash function (a
-    // put() dropped from an override fails here, not only in a run). Rows hashed by another group's walk are skipped.
+    // The code hashes what the table says: every kHashed row's name appears as a literal in its class's hash function
+    // (a put() dropped from an override fails here, not only in a run). Rows hashed by another group's walk are
+    // skipped.
     auto site = [](const std::string& cls, const char* rule) -> std::string {
         for (const oracle::HashSite& s : oracle::kHashSites) {
             if (cls == s.cls) {
@@ -2279,13 +2291,15 @@ static void test_subclass_coverage() {
         CHECK(staticKeys.count({ r.file, r.name }) == 1);
         CHECK(std::strlen(r.rule) > 0);
     }
-    // Positive control of the static sweep: the two hoisted angles, Thwomp's hoisted temp_s7 and a brace-initialized one.
+    // Positive control of the static sweep: the two hoisted angles, Thwomp's hoisted temp_s7 and a brace-initialized
+    // one.
     CHECK(staticKeys.count({ "src/engine/actors/SpaghettiShip.cpp", "sSpaghettiShipAngle" }) == 1);
     CHECK(staticKeys.count({ "src/engine/actors/Starship.cpp", "sStarshipAngle" }) == 1);
     CHECK(staticKeys.count({ "src/engine/objects/Thwomp.cpp", "sThwompTempS7" }) == 1);
     CHECK(statics.size() > 10);
 
-    // Positive control: the scan can see (measured at 1.4b: the clang record layouts list 38 AActor/OObject subclasses).
+    // Positive control: the scan can see (measured at 1.4b: the clang record layouts list 38 AActor/OObject
+    // subclasses).
     CHECK(src.files >= 60);
     CHECK(members.size() > 300);
     CHECK(subclasses >= 38);
@@ -2297,10 +2311,12 @@ static void test_subclass_coverage() {
 static int print_coverage() {
     const CoverageSource src = ScanCoverageSource();
     for (const SrcMember& m : src.members) {
-        std::printf("%s · %s%s · %s\n", m.cls.c_str(), m.member.c_str(), m.isStatic ? " [static]" : "", m.where.c_str());
+        std::printf("%s · %s%s · %s\n", m.cls.c_str(), m.member.c_str(), m.isStatic ? " [static]" : "",
+                    m.where.c_str());
     }
     for (const SrcClass& c : src.engineClasses) {
-        std::printf("#class %s : %s · %s\n", c.name.c_str(), c.bases.empty() ? "" : c.bases[0].c_str(), c.where.c_str());
+        std::printf("#class %s : %s · %s\n", c.name.c_str(), c.bases.empty() ? "" : c.bases[0].c_str(),
+                    c.where.c_str());
     }
     for (const SrcMember& m : src.cppStatics) {
         std::printf("#static %s · %s · %s\n", m.cls.c_str(), m.member.c_str(), m.where.c_str());

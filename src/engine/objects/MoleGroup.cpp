@@ -84,7 +84,7 @@ void OMoleGroup::HashState(oracle::Hasher& h) const {
     for (size_t i = 0; i < _moles.size(); i++) {
         oracle::Hasher::Scope e(h, i);
         const MoleEntry& m = _moles[i];
-        oracle::PutObjectPtr(h, "Mole", m.Mole); // the OMole by its slot, never its address (FASE 1.4b: the shared helper)
+        oracle::PutObjectPtr(h, "Mole", m.Mole); // the OMole by its slot, never its address (FASE 1.4b helper)
         put(h, "Pos", m.Pos);
         put(h, "Active", m.Active);
     }

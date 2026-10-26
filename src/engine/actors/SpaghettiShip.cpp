@@ -29,8 +29,8 @@ ASpaghettiShip::ASpaghettiShip(const SpawnParams& params) : AActor(params) {
     Rot[2] = rot.roll;
 }
 
-// MK64 Online FASE 1.4b: was `static float angle` inside ASpaghettiShip::Tick — hoisted (pure rename, same zero initial
-// value) so the oracle can hash it. Shared by every instance, exactly as the function-static was.
+// MK64 Online FASE 1.4b: was a function-local static `angle` inside ASpaghettiShip::Tick — hoisted (pure rename, same
+// zero initial value) so the oracle can hash it. Shared by every instance, exactly as the function-static was.
 static float sSpaghettiShipAngle = 0.0f; // Keeps track of the ship's rotation around the circle
 
 void ASpaghettiShip::Tick() {

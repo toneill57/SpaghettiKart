@@ -39,8 +39,8 @@ public:
         mMap.clear();
     }
 
-    // MK64 Online FASE 1.4b: read-only visit of every (name, object), for the oracle to name a pointed object by its key.
-    // Visiting order is the map's (unordered): callers must not depend on it.
+    // MK64 Online FASE 1.4b: read-only visit of every (name, object), for the oracle to name a pointed object by its
+    // key. Visiting order is the map's (unordered): callers must not depend on it.
     template <typename F> void ForEach(F&& f) const {
         for (const auto& kv : mMap) {
             f(kv.first, *kv.second);

@@ -1,13 +1,13 @@
 #pragma once
-// MK64 Online FASE 1.4b: what the state hash covers, member by member. Std-only: oracle_tests re-derives every data member of
-// every class in kCoverageHeaders FROM SOURCE TEXT and fails on a member in no table, a row naming a member that no longer
-// exists, or a member in both tables (test_subclass_coverage). The compiler's record layouts are the second method
-// (implement/fase-1-artifacts/1.4b/inventory.py); the two must agree.
+// MK64 Online FASE 1.4b: what the state hash covers, member by member. Std-only: oracle_tests re-derives every data
+// member of every class in kCoverageHeaders FROM SOURCE TEXT and fails on a member in no table, a row naming a member
+// that no longer exists, or a member in both tables (test_subclass_coverage). The compiler's record layouts are the
+// second method (implement/fase-1-artifacts/1.4b/inventory.py); the two must agree.
 //
-// Member rules (the `rule` column of kHashed names one; OracleHash.h's put() refuses pointers at compile time, which is what
-// forces every pointer through one of these):
-//   scalar      put(h, "name", m) — scalars, enums, Vec3f/Vec3s/FVector/IRotator/IPathSpan, fixed arrays (walked element
-//               by element), POD structs with an ORACLE_*_FIELDS list in OracleStatePut.h
+// Member rules (the `rule` column of kHashed names one; OracleHash.h's put() refuses pointers at compile time, which is
+// what forces every pointer through one of these):
+//   scalar      put(h, "name", m) — scalars, enums, Vec3f/Vec3s/FVector/IRotator/IPathSpan, fixed arrays (walked
+//               element by element), POD structs with an ORACLE_*_FIELDS list in OracleStatePut.h
 //   size_t      put(h, "name", (uint64_t) m) — width differs on 32-bit targets
 //   vector      size, then the elements by index under a Scope
 //   string      size, then the bytes (h.bytes)
@@ -17,8 +17,8 @@
 //   object-ptr  the target OObject's _objectIndex (or AActor's deque index), -2 for null (OMoleGroup precedent)
 //   emitter-ptr the target's index in World::Emitters, -1 for null
 //   camera-ptr  the index in cameras[] (src/camera.c), -1 for null
-//   flag-ptr    which target (a small enum: own member / a named global / other), then the POINTED value when the target is
-//               known memory
+//   flag-ptr    which target (a small enum: own member / a named global / other), then the POINTED value when the
+//               target is known memory
 //   table-key   the name that registers the pointed table in its registry (gItemTableRegistry), then the table itself
 //   cup-ptr     the index in World::Cups, -1 for null
 //   group:<g>   hashed by another group's walk (named), e.g. World::Actors by `actors`
@@ -54,8 +54,8 @@ struct CoverageRow {
     const char* rule;   // kHashed: one of the rules above; kExcluded: the reason
 };
 
-// Every class/struct DEFINED in these files is in scope (unless listed in kOutOfScopeClasses), and every class anywhere in
-// src/engine that derives — directly or not — from one of kCoverageRoots must be defined in one of these files.
+// Every class/struct DEFINED in these files is in scope (unless listed in kOutOfScopeClasses), and every class anywhere
+// in src/engine that derives — directly or not — from one of kCoverageRoots must be defined in one of these files.
 inline constexpr const char* kCoverageHeaders[] = {
     "src/engine/Actor.h",
     "src/engine/actors/Banana.h",
@@ -144,7 +144,8 @@ inline constexpr const char* kCoverageHeaders[] = {
     "src/engine/World.h",
 };
 
-inline constexpr const char* kCoverageRoots[] = { "AActor", "OObject", "GameCamera", "ParticleEmitter", "Track", "SkyActor" };
+inline constexpr const char* kCoverageRoots[] = { "AActor",          "OObject", "GameCamera",
+                                                  "ParticleEmitter", "Track",   "SkyActor" };
 
 struct OutOfScopeClass {
     const char* cls;
@@ -155,8 +156,8 @@ inline constexpr OutOfScopeClass kOutOfScopeClasses[] = {
     { "World::Matrix", "type of the excluded World::world_mtx only" },
 };
 
-// Where a class's rows are put(): "<cls>::HashState" (or ::HashStatics for rule `statics`) unless listed here. oracle_tests
-// checks that every kHashed row's name is a literal in that function's body.
+// Where a class's rows are put(): "<cls>::HashState" (or ::HashStatics for rule `statics`) unless listed here.
+// oracle_tests checks that every kHashed row's name is a literal in that function's body.
 struct HashSite {
     const char* cls;
     const char* site;
@@ -175,9 +176,9 @@ inline constexpr HashSite kHashSites[] = {
     { "TourCamera::KeyFrame", "Track::HashState" },
 };
 
-// Statics outside the class tables: file-scope / function-local statics of src/engine and src/port/oracle .cpp files, and
-// the class statics of classes outside kCoverageHeaders. `file` is the defining file (or the header, for a class static);
-// kStaticsHashed's `rule` is the function that hashes it, kStaticsExcluded's the reason.
+// Statics outside the class tables: file-scope / function-local statics of src/engine and src/port/oracle .cpp files,
+// and the class statics of classes outside kCoverageHeaders. `file` is the defining file (or the header, for a class
+// static); kStaticsHashed's `rule` is the function that hashes it, kStaticsExcluded's the reason.
 struct StaticRow {
     const char* file;
     const char* name;
@@ -690,8 +691,8 @@ inline constexpr CoverageRow kExcluded[] = {
       "dead: never written or read (rg: the declaration only) — the active tables live in gItemTableRegistry and are "
       "hashed through mHumanItemTable / mCPUItemTable" },
     { "TrackBrowser", "mTracks",
-      "registry-derived: gTrackRegistry's track list sorted by id (TrackBrowser.h constructor / Refresh); identity covered by "
-      "modListHash" },
+      "registry-derived: gTrackRegistry's track list sorted by id (TrackBrowser.h constructor / Refresh); "
+      "identity covered by modListHash" },
     { "TrackBrowser", "Instance", "identity: the pointer to the one TrackBrowser (gTrackBrowser), not state" },
     { "AActor", "Model", kClassConstantName },
     { "AActor", "uuid", kNoReaderOrWriter },

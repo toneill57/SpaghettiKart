@@ -582,8 +582,8 @@ void Track::HashState(oracle::Hasher& h) const {
     using oracle::put;
     put(h, "ResourceName", ResourceName);
     {
-        // Properties, field by field; its pointers (AIBehaviour, AIDistance, PathTable, PathTable2, CloudTexture, Clouds,
-        // CloudList, Minimap.Texture) are assets (excluded).
+        // Properties, field by field; its pointers (AIBehaviour, AIDistance, PathTable, PathTable2, CloudTexture,
+        // Clouds, CloudList, Minimap.Texture) are assets (excluded).
         oracle::Hasher::Scope s(h, "Props");
         const Properties& p = Props;
         put(h, "Name", p.Name);

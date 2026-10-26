@@ -302,10 +302,10 @@ void World::CleanActors(void) {
     Objects.clear();
 }
 
-// MK64 Online FASE 1.4b: the oracle's `world` group (OracleStateHash.cpp HashWorld). The order is fixed — it IS the hash
-// input order: track, cups, cameras, static meshes, emitters, battle bomb karts, train crossings, race manager, sky, the
-// track browser, the class statics (alphabetical), the C globals subclass members point at. Containers by index (T4 C09). Every member's
-// classification is src/port/oracle/OracleCoverage.h.
+// MK64 Online FASE 1.4b: the oracle's `world` group (OracleStateHash.cpp HashWorld). The order is fixed — it IS the
+// hash input order: track, cups, cameras, static meshes, emitters, battle bomb karts, train crossings, race manager,
+// sky, the track browser, the class statics (alphabetical), the C globals subclass members point at. Containers by
+// index (T4 C09). Every member's classification is src/port/oracle/OracleCoverage.h.
 void World::HashState(oracle::Hasher& h) const {
     using oracle::put;
     {
@@ -551,8 +551,8 @@ void World::HashState(oracle::Hasher& h) const {
         }
     }
     {
-        // The C globals that subclass members point at or read directly (OTrophy, OHotAirBalloon). Every other mutable C
-        // global is the separate C-globals task (decision 2, 2026-10-26).
+        // The C globals that subclass members point at or read directly (OTrophy, OHotAirBalloon). Every other mutable
+        // C global is the separate C-globals task (decision 2, 2026-10-26).
         oracle::Hasher::Scope s(h, "cglobals");
         put(h, "D_80165898", D_80165898);
         put(h, "D_801658CE", D_801658CE);

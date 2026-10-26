@@ -219,8 +219,9 @@ template <typename T, size_t N> void put(Hasher& h, const char* n, const T (&a)[
     }
 }
 
-// FASE 1.4b added `world` (the World-level state outside the actor / object deques). The format stays MK64HASH 1: nothing
-// consumed the nine-group v1 before it (1.6 unbuilt, no baseline); the `# groups=` line names what a log carries.
+// FASE 1.4b added `world` (the World-level state outside the actor / object deques). The format stays MK64HASH 1:
+// nothing consumed the nine-group v1 before it (1.6 unbuilt, no baseline); the `# groups=` line names what a log
+// carries.
 enum Group : int {
     kRng,
     kRace,
