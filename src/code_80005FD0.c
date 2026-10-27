@@ -6626,8 +6626,10 @@ void func_80019C50(s32 arg0) {
     }
 }
 
+// Hoisted from look_behind_toggle (FASE 1.4c) so the oracle can hash it: same storage, same zero start.
+bool gLookBehindActive[NUM_CAMERAS] = { 0 };
+
 void look_behind_toggle(s32 cameraIdx) {
-    static bool lookBehindActive[NUM_CAMERAS] = {0};
     bool pressed = gControllers[cameraIdx].button & L_CBUTTONS; // button held
     ScreenContext* screenCtx = NULL;
 
@@ -6644,18 +6646,18 @@ void look_behind_toggle(s32 cameraIdx) {
 
     if (gRaceState == RACE_IN_PROGRESS) {
         // Flip the camera
-        if (pressed && !lookBehindActive[cameraIdx]) {
+        if (pressed && !gLookBehindActive[cameraIdx]) {
             screenCtx->pendingCamera = screenCtx->lookBehindCamera;
-            lookBehindActive[cameraIdx] = true;
+            gLookBehindActive[cameraIdx] = true;
         // Unflip the camera
-        } else if (!pressed && lookBehindActive[cameraIdx]) {
+        } else if (!pressed && gLookBehindActive[cameraIdx]) {
             screenCtx->pendingCamera = screenCtx->raceCamera;
-            lookBehindActive[cameraIdx] = false;
+            gLookBehindActive[cameraIdx] = false;
         }
-    } else if (lookBehindActive[cameraIdx]) {
+    } else if (gLookBehindActive[cameraIdx]) {
         // Restore the original camera
         screenCtx->pendingCamera = screenCtx->raceCamera;
-        lookBehindActive[cameraIdx] = false;
+        gLookBehindActive[cameraIdx] = false;
     }
 }
 

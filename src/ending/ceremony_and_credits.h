@@ -219,8 +219,8 @@ extern s32 D_802876D8;
 extern s32 D_802876DC; // fake/padding? Or D8 is array?
 extern CinematicCamera D_802876E0;
 extern struct struct_80283431 D_80287750[];
-extern struct struct_80283430 D_80287818[];
-extern struct struct_80283430 D_80287998[];
+extern struct struct_80283430 D_80287818[32]; // FASE 1.4c: bounded for the oracle
+extern struct struct_80283430 D_80287998[32]; // FASE 1.4c: bounded for the oracle
 extern f32 sCutsceneSplineSegmentProgress;
 extern s16 sCutsceneSplineSegment;
 extern s16 D_80287B1E;

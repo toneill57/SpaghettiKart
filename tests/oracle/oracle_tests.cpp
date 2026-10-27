@@ -6,8 +6,10 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <initializer_list>
 #include <iterator>
+#include <map>
 #include <string>
 #include <set>
 #include <vector>
@@ -20,6 +22,7 @@
 #include "port/oracle/OracleReplay.h"
 #include "port/oracle/OracleArchiveHash.h"
 #include "port/oracle/OracleCoverage.h"
+#include "port/oracle/OracleCGlobals.h"
 
 #include <cstddef> // offsetof (--print-offsets)
 
@@ -54,6 +57,13 @@ static void test_zip_content_hash();       // 1.5 amendment: portArchiveHash = c
 static void test_coverage_parser();        // 1.4b.2: the source-text member parser on a fixture (its positive control)
 static void test_subclass_coverage();      // 1.4b.2: 0 unclassified / 0 stale / 0 duplicated (critic)
 static int print_coverage();               // 1.4b.2: --print-coverage, the source-text member list (vs. the clang dump)
+static void test_cglobal_parser();         // 1.4c.2: the C definition scanner on a fixture (its positive control)
+static void test_cglobal_coverage();       // 1.4c.2: every C definition in exactly one table (critic)
+static void test_hash_dispatch();          // 1.4c.2: every HashState / HashStatics owner is called (critic)
+static void test_pool_gates();             // 1.4c: every pool-content owner has one kPoolGates row (critic)
+static void test_cpp_global_rows();        // 1.4c.1 e: no stale C++ global row; every hashed one is hashed
+static void test_cglobal_walk();           // 1.4c.3: every kCGlobalsHashed row is hashed by name in the walk
+static int print_cglobals();               // 1.4c.2: --print-cglobals, the source-text definition list (vs. the IR)
 
 int main(int argc, char** argv) {
     // Packed offsets measured by the compiler that writes the files (FASE 1.5 Validation Commands): a byte patch of a
@@ -69,6 +79,9 @@ int main(int argc, char** argv) {
     }
     if (argc > 1 && std::strcmp(argv[1], "--print-coverage") == 0) {
         return print_coverage();
+    }
+    if (argc > 1 && std::strcmp(argv[1], "--print-cglobals") == 0) {
+        return print_cglobals();
     }
     test_guard_table();
     test_guard_fatal_before_pin();
@@ -91,6 +104,12 @@ int main(int argc, char** argv) {
     test_zip_content_hash();
     test_coverage_parser();
     test_subclass_coverage();
+    test_cglobal_parser();
+    test_cglobal_coverage();
+    test_hash_dispatch();
+    test_pool_gates();
+    test_cpp_global_rows();
+    test_cglobal_walk();
     std::printf("oracle_tests: %d failure(s)\n", gFailures);
     return gFailures == 0 ? 0 : 1;
 }
@@ -568,16 +587,17 @@ static void test_hasher_scalars() {
               sink.fields[0].bits == 0x80000000ull);
         CHECK(sink.fields.size() == 2 && sink.fields[1].type == "s16" && sink.fields[1].bits == 0xfffeull);
     }
-    // `all` = FNV over the group values as LE u64 (ten groups since FASE 1.4b; python3 FNV-1a over struct.pack('<Q'),
-    // which also reproduces the nine-group values this test pinned before: 0x60b3e1fa9c9c0ca4 / 0x3ecb33e15783bec5).
+    // `all` = FNV over the group values as LE u64 (eleven groups since FASE 1.4c; python3 FNV-1a over
+    // struct.pack('<Q'), which also reproduces the values this test pinned before: nine groups 0x60b3e1fa9c9c0ca4 /
+    // 0x3ecb33e15783bec5, ten groups 0xcedc94dfee39ee6e / 0xf14b84b8290b8965).
     {
         uint64_t g[oracle::kGroupCount];
         for (int i = 0; i < oracle::kGroupCount; i++) {
             g[i] = (uint64_t) (i + 1);
         }
-        CHECK(oracle::Combine(g) == 0xcedc94dfee39ee6eull);
+        CHECK(oracle::Combine(g) == 0x36d17bacf6abed05ull);
         uint64_t z[oracle::kGroupCount] = {};
-        CHECK(oracle::Combine(z) == 0xf14b84b8290b8965ull);
+        CHECK(oracle::Combine(z) == 0x7479744ad77ee805ull);
     }
     {
         oracle::GroupHashes a{};
@@ -588,9 +608,12 @@ static void test_hasher_scalars() {
         b.all = 7; // `all` is not a group of its own
         CHECK(oracle::DifferingGroups(a, b) == ((1u << oracle::kRng) | (1u << oracle::kRaceArrays)));
     }
-    CHECK(oracle::kGroupCount == 10);
+    CHECK(oracle::kGroupCount == 11);
     CHECK(std::string(oracle::kGroupNames[0]) == "rng" && std::string(oracle::kGroupNames[8]) == "racearrays");
     CHECK(std::string(oracle::kGroupNames[9]) == "world" && oracle::kWorld == 9); // FASE 1.4b
+    // FASE 1.4c (index guarded: a wrong count must fail here, not read past kGroupNames)
+    CHECK(oracle::kGroupCount > 10 && std::string(oracle::kGroupNames[oracle::kGroupCount > 10 ? 10 : 0]) == "cglobals" &&
+          oracle::kCGlobals == 10);
 }
 
 namespace {
@@ -675,12 +698,12 @@ const char* kMetaExpected =
     "binaryHash=0x3333333333333333\n"
     "# tickLogic=2 seed=0x1234 fpWord=0x0000020000000000 configHash=0x4444444444444444 modListHash=0x5555555555555555 "
     "gameArchiveHash=0x1111111111111111 portArchiveHash=0x2222222222222222\n"
-    "# groups=rng,race,players,controllers,objects,actors,oobjects,cameras,racearrays,world,all\n";
+    "# groups=rng,race,players,controllers,objects,actors,oobjects,cameras,racearrays,world,cglobals,all\n";
 
 const char* kLine7Expected =
     "7 rng=0123456789abcdef race=0123456789abcdf0 players=0123456789abcdf1 controllers=0123456789abcdf2 "
     "objects=0123456789abcdf3 actors=0123456789abcdf4 oobjects=0123456789abcdf5 cameras=0123456789abcdf6 "
-    "racearrays=0123456789abcdf7 world=0123456789abcdf8 all=fedcba9876543210\n";
+    "racearrays=0123456789abcdf7 world=0123456789abcdf8 cglobals=0123456789abcdf9 all=fedcba9876543210\n";
 
 } // namespace
 
@@ -2336,4 +2359,1114 @@ static int print_coverage() {
     }
     std::printf("#files %zu members %zu\n", src.files, src.members.size());
     return 0;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// FASE 1.4c — the C-globals critic and the dispatch critic. Every file-scope and function-local non-const definition of
+// every C file the game compiles is re-derived FROM SOURCE TEXT (the file list comes from CMakeLists.txt's own globs);
+// the compiler's IR (1.4c/globals.py: which of them an iteration stores to) is the second method.
+
+namespace {
+
+struct CDef {
+    std::string file;   // repo-relative
+    std::string symbol; // the IR's name: "<function>.<name>" for a function-local static
+    std::string where;  // file:line
+};
+
+struct CMacroUse { // a file-scope statement that is one ALL-CAPS macro invocation: what it defines, the IR alone can see
+    std::string name;
+    std::string where; // file:line
+};
+
+bool HasWord(const std::string& s, const char* w) {
+    for (const std::string& x : Idents(s)) {
+        if (x == w) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The name one declarator declares (initializer and top-level array bounds already cut): inside "(*name)" for a pointer
+// to a function or to an array, else the last identifier ("* const p" -> p).
+std::string DeclaratorName(const std::string& d) {
+    std::string inner = d;
+    const size_t open = FindTop(d, "(");
+    if (open != std::string::npos) {
+        const size_t close = MatchingClose(d, open);
+        inner = d.substr(open + 1, close == std::string::npos ? std::string::npos : close - open - 1);
+        inner = inner.substr(0, FindTop(inner, "[("));
+    }
+    std::vector<std::string> ids = Idents(inner);
+    while (!ids.empty() && (ids.back() == "const" || ids.back() == "volatile" || ids.back() == "restrict")) {
+        ids.pop_back();
+    }
+    return ids.empty() ? "" : ids.back();
+}
+
+// Leading qualifier macros (UNUSED, ALIGNED8, …) of a C declaration: an ALL-CAPS word not followed by '(' is dropped only
+// while at least two identifiers (a type and a name) still follow it. The decomp's type and variable names are often
+// ALL-CAPS too (RGBA16, D_800E74A8), which 1.4b's C++ DropMacros would eat.
+std::string DropCMacros(std::string s) {
+    for (;;) {
+        s = Trim(s);
+        const std::vector<std::string> w = Idents(s);
+        if (w.size() < 3 || s.find(w[0]) != 0 ||
+            std::any_of(w[0].begin(), w[0].end(), [](char ch) { return std::islower((unsigned char) ch); })) {
+            return s;
+        }
+        const std::string rest = Trim(s.substr(w[0].size()));
+        const std::string head = rest.substr(0, FindTop(rest, "[=("));
+        if ((!rest.empty() && rest[0] == '(') || Idents(head).size() < 2) {
+            return s;
+        }
+        s = rest;
+    }
+}
+
+// The C preprocessor's conditionals, as the macOS arm64 Release build evaluates them: lines in an inactive branch become
+// blank (newlines kept). Macros come from cmake/SetFlags.cmake's target_compile_definitions, the compiler, and the
+// file's own #define / #undef; an expression naming anything else is UNKNOWN and keeps every branch.
+std::string ActiveCText(const std::string& raw) {
+    std::map<std::string, long> defined = { { "NDEBUG", 1 },       { "VERSION_US", 1 }, { "ENABLE_RUMBLE", 1 },
+                                            { "F3DEX_GBI", 1 },    { "_LANGUAGE_C", 1 }, { "_USE_MATH_DEFINES", 1 },
+                                            { "NON_MATCHING", 1 }, { "NON_EQUIVALENT", 1 }, { "AVOID_UB", 1 },
+                                            { "__clang__", 1 },    { "__GNUC__", 4 },   { "__aarch64__", 1 },
+                                            { "DVDL", 0 } }; // DVDL: include/debug.h:17
+    std::set<std::string> undefined = { "TARGET_N64", "VERSION_EU", "VERSION_EU_1_0", "DEBUG", "MIPS_TO_C",
+                                        "AVOID_UB_WIP", "__SANITIZE_ADDRESS__", "__SSE2__", "CRASH_SCREEN_ENHANCEMENT",
+                                        "__cplusplus" };
+    enum class V { False, True, Unknown };
+    // Recursive descent over || && ! ( ) defined(X) / defined X, integers and identifiers; nullopt = unknown.
+    auto eval = [&](std::string e) -> V {
+        e = e.substr(0, e.find("//"));
+        size_t i = 0;
+        auto skip = [&] {
+            while (i < e.size() && std::isspace((unsigned char) e[i])) {
+                i++;
+            }
+        };
+        auto ident = [&] {
+            skip();
+            const size_t b = i;
+            while (i < e.size() && IsIdentChar(e[i])) {
+                i++;
+            }
+            return e.substr(b, i - b);
+        };
+        std::function<int(void)> orExpr; // -1 unknown, else 0/1
+        std::function<int(void)> unary = [&]() -> int {
+            skip();
+            if (i < e.size() && e[i] == '!') {
+                i++;
+                const int v = unary();
+                return v < 0 ? -1 : !v;
+            }
+            if (i < e.size() && e[i] == '(') {
+                i++;
+                const int v = orExpr();
+                skip();
+                if (i < e.size() && e[i] == ')') {
+                    i++;
+                }
+                return v;
+            }
+            const std::string w = ident();
+            if (w == "defined") {
+                skip();
+                const bool paren = i < e.size() && e[i] == '(';
+                if (paren) {
+                    i++;
+                }
+                const std::string m = ident();
+                skip();
+                if (paren && i < e.size() && e[i] == ')') {
+                    i++;
+                }
+                return defined.count(m) ? 1 : undefined.count(m) ? 0 : -1;
+            }
+            if (!w.empty() && std::isdigit((unsigned char) w[0])) {
+                return std::strtol(w.c_str(), nullptr, 0) != 0;
+            }
+            if (defined.count(w)) {
+                return defined[w] != 0;
+            }
+            return undefined.count(w) ? 0 : -1;
+        };
+        std::function<int(void)> andExpr = [&]() -> int {
+            int v = unary();
+            for (skip(); e.compare(i, 2, "&&") == 0; skip()) {
+                i += 2;
+                const int r = unary();
+                v = (v == 0 || r == 0) ? 0 : (v < 0 || r < 0) ? -1 : 1;
+            }
+            return v;
+        };
+        orExpr = [&]() -> int {
+            int v = andExpr();
+            for (skip(); e.compare(i, 2, "||") == 0; skip()) {
+                i += 2;
+                const int r = andExpr();
+                v = (v == 1 || r == 1) ? 1 : (v < 0 || r < 0) ? -1 : 0;
+            }
+            return v;
+        };
+        const int v = orExpr();
+        skip();
+        return (v < 0 || i < e.size()) ? V::Unknown : v ? V::True : V::False;
+    };
+    struct Frame {
+        bool parent, taken, unknown;
+    };
+    std::vector<Frame> stack;
+    bool active = true;
+    std::string out;
+    size_t pos = 0;
+    while (pos < raw.size()) {
+        size_t eol = raw.find('\n', pos);
+        if (eol == std::string::npos) {
+            eol = raw.size();
+        }
+        const std::string line = raw.substr(pos, eol - pos);
+        const std::string t = Trim(line);
+        bool keep = active;
+        if (!t.empty() && t[0] == '#') {
+            const std::string d = Trim(t.substr(1));
+            const std::vector<std::string> w = Idents(d);
+            const std::string kw = w.empty() ? "" : w[0];
+            const std::string arg = Trim(d.substr(std::min(d.size(), kw.size())));
+            if (kw == "if" || kw == "ifdef" || kw == "ifndef") {
+                const std::string m = Idents(arg).empty() ? "" : Idents(arg)[0];
+                const V v = kw == "if" ? eval(arg)
+                            : (defined.count(m) || undefined.count(m))
+                                ? ((defined.count(m) != 0) == (kw == "ifdef") ? V::True : V::False)
+                                : V::Unknown;
+                stack.push_back(Frame{ active, v == V::True, v == V::Unknown });
+                active = active && v != V::False;
+            } else if (kw == "elif" && !stack.empty()) {
+                Frame& f = stack.back();
+                if (f.unknown) {
+                    active = f.parent; // an earlier branch was unknown: keep this one too
+                } else if (f.taken) {
+                    active = false;
+                } else {
+                    const V v = eval(arg);
+                    f.unknown = v == V::Unknown;
+                    f.taken = v == V::True;
+                    active = f.parent && v != V::False;
+                }
+            } else if (kw == "else" && !stack.empty()) {
+                Frame& f = stack.back();
+                active = f.unknown ? f.parent : f.parent && !f.taken;
+                f.taken = true;
+            } else if (kw == "endif" && !stack.empty()) {
+                active = stack.back().parent;
+                stack.pop_back();
+            } else if (active && kw == "define" && w.size() >= 2) {
+                defined[w[1]] = 1;
+                undefined.erase(w[1]);
+            } else if (active && kw == "undef" && w.size() >= 2) {
+                defined.erase(w[1]);
+                undefined.insert(w[1]);
+            }
+            // `keep` stays the state BEFORE the directive: an #include / #define in a dead branch is not text, or the include
+            // crawler follows it (it did: World.h, a C++ header, reached through `#ifdef __cplusplus` lines).
+        }
+        out += keep ? line : std::string();
+        if (eol < raw.size()) {
+            out += '\n';
+        }
+        pos = eol + 1;
+    }
+    return out;
+}
+
+// An ALL-CAPS identifier (letters, digits, '_'; at least one letter, none lower-case): the decomp's macro spelling.
+bool IsMacroName(const std::string& s) {
+    bool letter = false;
+    for (size_t k = 0; k < s.size(); k++) {
+        if (!IsIdentChar(s[k]) || std::islower((unsigned char) s[k]) || (k == 0 && std::isdigit((unsigned char) s[k]))) {
+            return false;
+        }
+        letter = letter || std::isupper((unsigned char) s[k]);
+    }
+    return letter;
+}
+
+// Whether the OBJECT a declarator names is const: `const` binds the object only when no '*' follows the last one, so
+// `const char* p` is mutable state and `char* const p` / `const u8 tbl[]` are not.
+bool ConstObject(const std::string& spec, const std::string& decl) {
+    const size_t star = decl.rfind('*');
+    if (star != std::string::npos) {
+        return HasWord(decl.substr(star + 1), "const");
+    }
+    return HasWord(spec, "const") || HasWord(decl, "const");
+}
+
+// One declaration statement (brace bodies already collapsed to "{}"). `fn` is the enclosing function, "" at file scope.
+void CStatement(const std::string& raw, const std::string& file, const std::string& where, const std::string& fn,
+                std::vector<CDef>& out) {
+    const std::string stmt = DropCMacros(Trim(raw));
+    if (stmt.empty() || StartsWithWord(stmt, "typedef") || StartsWithWord(stmt, "extern")) {
+        return;
+    }
+    const std::vector<std::string> pieces = SplitTop(stmt, ',');
+    auto cut = [](std::string d) {
+        d = d.substr(0, FindTop(d, "="));
+        const size_t b = FindTop(d, "[");
+        return Trim(b == std::string::npos ? d : d.substr(0, b));
+    };
+    const std::string first = cut(pieces[0]);
+    if (first.size() >= 2 && first.compare(first.size() - 2, 2, "{}") == 0) {
+        return; // a tag definition with no declarator: `struct S {…};`, `enum {…};`
+    }
+    const size_t paren = FindTop(first, "(");
+    if (paren != std::string::npos) {
+        size_t q = paren + 1;
+        while (q < first.size() && std::isspace((unsigned char) first[q])) {
+            q++;
+        }
+        if (q >= first.size() || first[q] != '*') {
+            return; // a prototype: a top-level '(' that does not open a "(*name)" declarator
+        }
+    }
+    const std::string name0 = DeclaratorName(first);
+    if (name0.empty()) {
+        return;
+    }
+    if ((StartsWithWord(first, "struct") || StartsWithWord(first, "union") || StartsWithWord(first, "enum")) &&
+        Idents(first).size() == 2 && pieces.size() == 1 && first.find("{}") == std::string::npos) {
+        return; // a forward declaration `struct S;`
+    }
+    // The specifiers end where the first declarator begins: its first top-level '*', its "(*", or its name.
+    size_t namePos = std::string::npos;
+    for (size_t k = first.rfind(name0); k != std::string::npos; k = k == 0 ? std::string::npos : first.rfind(name0, k - 1)) {
+        if ((k == 0 || !IsIdentChar(first[k - 1])) &&
+            (k + name0.size() >= first.size() || !IsIdentChar(first[k + name0.size()]))) {
+            namePos = k;
+            break;
+        }
+    }
+    const size_t specEnd = std::min({ FindTop(first, "*"), paren, namePos });
+    const std::string spec = first.substr(0, specEnd);
+    for (size_t k = 0; k < pieces.size(); k++) {
+        const std::string decl = k == 0 ? first.substr(specEnd) : cut(pieces[k]);
+        const std::string name = DeclaratorName(decl);
+        if (name.empty() || ConstObject(spec, decl)) {
+            continue;
+        }
+        out.push_back(CDef{ file, fn.empty() ? name : fn + "." + name, where });
+    }
+}
+
+struct CScanner {
+    std::string file;
+    std::string t; // stripped
+    std::vector<size_t> lineStarts;
+    std::vector<CDef> out;
+    std::vector<CMacroUse> macros;
+
+    CScanner(const std::string& raw, const std::string& f) : file(f), t(StripSource(ActiveCText(raw))) {
+        // GLOBAL_ASM("…") (the NON_MATCHING #else branches; the preprocessor lines around it are already blanked) is
+        // not followed by ';': blank it so it cannot merge with the next statement.
+        for (size_t p = t.find("GLOBAL_ASM"); p != std::string::npos; p = t.find("GLOBAL_ASM", p + 1)) {
+            const size_t open = t.find('(', p);
+            const size_t close = open == std::string::npos ? std::string::npos : MatchingClose(t, open);
+            if (close != std::string::npos) {
+                for (size_t k = p; k <= close; k++) {
+                    t[k] = t[k] == '\n' ? '\n' : ' ';
+                }
+            }
+        }
+        lineStarts.push_back(0);
+        for (size_t i = 0; i < t.size(); i++) {
+            if (t[i] == '\n') {
+                lineStarts.push_back(i + 1);
+            }
+        }
+    }
+
+    std::string Where(size_t pos) const {
+        const size_t line = (size_t) (std::upper_bound(lineStarts.begin(), lineStarts.end(), pos) - lineStarts.begin());
+        return file + ":" + std::to_string(line);
+    }
+
+    // `static` declarations inside a function body [b, e) — the IR names them "<function>.<name>".
+    void FunctionStatics(size_t b, size_t e, const std::string& fn) {
+        for (size_t p = t.find("static", b); p != std::string::npos && p < e; p = t.find("static", p + 6)) {
+            if ((p > 0 && IsIdentChar(t[p - 1])) || (p + 6 < t.size() && IsIdentChar(t[p + 6]))) {
+                continue;
+            }
+            std::string stmt;
+            size_t i = p;
+            for (; i < e && t[i] != ';'; i++) {
+                if (t[i] == '(' || t[i] == '[' || t[i] == '{') {
+                    const size_t close = MatchingClose(t, i);
+                    if (close == std::string::npos || close > e) {
+                        break;
+                    }
+                    stmt += t[i] == '{' ? std::string("{}") : t.substr(i, close - i + 1);
+                    i = close;
+                    continue;
+                }
+                stmt += t[i];
+            }
+            CStatement(stmt, file, Where(p), fn, out);
+            p = i;
+        }
+    }
+
+    void FileScope() {
+        std::string stmt;
+        size_t stmtPos = 0;
+        for (size_t i = 0; i < t.size(); i++) {
+            const char c = t[i];
+            if (stmt.empty()) {
+                if (std::isspace((unsigned char) c)) {
+                    continue;
+                }
+                stmtPos = i;
+            }
+            if (c == '(' || c == '[') {
+                const size_t close = MatchingClose(t, i);
+                if (close == std::string::npos) {
+                    return;
+                }
+                if (c == '(' && IsMacroName(Trim(stmt))) {
+                    // `NAME(args)` alone: a statement when ';' follows, or when the next token starts a later line and
+                    // continues no declaration. Without this split it swallows the definition after it as a "prototype".
+                    const size_t j = t.find_first_not_of(" \t\r\n", close + 1);
+                    const bool semi = j != std::string::npos && t[j] == ';';
+                    const bool ends = j == std::string::npos || (t.find('\n', close + 1) < j && std::strchr("{=,;(", t[j]) == nullptr);
+                    if (semi || ends) {
+                        macros.push_back(CMacroUse{ Trim(stmt), Where(stmtPos) });
+                        stmt.clear();
+                        i = semi ? j : close;
+                        continue;
+                    }
+                }
+                stmt += t.substr(i, close - i + 1);
+                i = close;
+                continue;
+            }
+            if (c == '{') {
+                const size_t close = MatchingClose(t, i);
+                if (close == std::string::npos) {
+                    return;
+                }
+                const std::string head = DropCMacros(Trim(stmt));
+                const size_t p = FindTop(head, "(");
+                if ((head.empty() || head.back() != '=') && p != std::string::npos) {
+                    const std::vector<std::string> ids = Idents(head.substr(0, p));
+                    FunctionStatics(i + 1, close, ids.empty() ? "" : ids.back()); // a function body
+                    stmt.clear();
+                    i = close;
+                    continue;
+                }
+                stmt += "{}"; // an initializer, or a struct / union / enum body
+                i = close;
+                continue;
+            }
+            if (c == ';') {
+                CStatement(stmt, file, Where(stmtPos), "", out);
+                stmt.clear();
+                continue;
+            }
+            stmt += c;
+        }
+    }
+};
+
+struct CFileScan {
+    std::vector<CDef> defs;
+    std::vector<CMacroUse> macros;
+};
+
+CFileScan ScanCFile(const std::string& raw, const std::string& file) {
+    CScanner s(raw, file);
+    s.FileScope();
+    return CFileScan{ s.out, s.macros };
+}
+
+std::vector<CDef> ScanCDefinitions(const std::string& raw, const std::string& file) {
+    return ScanCFile(raw, file).defs;
+}
+
+struct CFileList {
+    std::vector<std::string> files;      // repo-relative, sorted
+    std::vector<std::string> unresolved; // `#include "….inc.c"` lines that name no file on disk (generated)
+    bool incFilter = false;              // CMakeLists.txt still drops *.inc.c from the build list
+    size_t headers = 0;                  // of `files`, the game headers reached by #include
+};
+
+// The C files the game compiles: CMakeLists.txt's own GLOB / GLOB_RECURSE patterns that end in ".c", minus "*.inc.c"
+// (its list(FILTER … EXCLUDE …)), plus every *.inc.c those files #include (their definitions live in the includer's TU).
+CFileList CompiledCFiles() {
+    namespace fs = std::filesystem;
+    const fs::path root = fs::path(ORACLE_SOURCE_DIR) / "..";
+    const std::string cm = ReadFile(root / "CMakeLists.txt");
+    CFileList out;
+    out.incFilter = cm.find("list(FILTER ALL_FILES EXCLUDE REGEX \".*.inc.c\")") != std::string::npos;
+    auto isInc = [](const std::string& f) { return f.size() > 6 && f.compare(f.size() - 6, 6, ".inc.c") == 0; };
+    std::set<std::string> files;
+    for (size_t p = cm.find("file("); p != std::string::npos; p = cm.find("file(", p + 5)) {
+        if (p > 0 && IsIdentChar(cm[p - 1])) {
+            continue;
+        }
+        const size_t close = MatchingClose(cm, p + 4);
+        if (close == std::string::npos) {
+            break;
+        }
+        const std::string block = cm.substr(p, close - p);
+        const bool recurse = block.find("GLOB_RECURSE") != std::string::npos;
+        if (!recurse && block.find("GLOB") == std::string::npos) {
+            continue;
+        }
+        for (size_t q = block.find('"'); q != std::string::npos;) {
+            const size_t q2 = block.find('"', q + 1);
+            if (q2 == std::string::npos) {
+                break;
+            }
+            const std::string pat = block.substr(q + 1, q2 - q - 1);
+            q = block.find('"', q2 + 1);
+            if (pat.size() < 2 || pat.compare(pat.size() - 2, 2, ".c") != 0) {
+                continue;
+            }
+            const size_t star = pat.find('*');
+            if (star == std::string::npos) {
+                if (fs::is_regular_file(root / pat)) {
+                    files.insert(pat);
+                }
+                continue;
+            }
+            const std::string dir = pat.substr(0, pat.rfind('/', star));
+            const std::string suffix = pat.substr(star + 1);
+            auto take = [&](const fs::directory_entry& e) {
+                const std::string name = e.path().filename().string();
+                if (e.is_regular_file() && name.size() >= suffix.size() &&
+                    name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0) {
+                    files.insert(fs::relative(e.path(), root).generic_string());
+                }
+            };
+            std::error_code ec;
+            if (recurse) {
+                for (auto it = fs::recursive_directory_iterator(root / dir, ec);
+                     !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+                    take(*it);
+                }
+            } else {
+                for (auto it = fs::directory_iterator(root / dir, ec); !ec && it != fs::directory_iterator();
+                     it.increment(ec)) {
+                    take(*it);
+                }
+            }
+        }
+    }
+    for (auto it = files.begin(); it != files.end();) {
+        it = isInc(*it) ? files.erase(it) : std::next(it);
+    }
+    // Then everything those files #include (active lines only) that resolves inside the game's own include directories
+    // (the compile line's -I: the repo root, include, include/assets, src): the *.inc.c files, and the headers — a
+    // header that DEFINES a variable defines it in every TU that includes it. libultraship / torch / build-cmake are
+    // not the game's.
+    const fs::path canonRoot = fs::weakly_canonical(root);
+    std::vector<std::string> todo(files.begin(), files.end());
+    while (!todo.empty()) {
+        const std::string f = todo.back();
+        todo.pop_back();
+        const std::string raw = ActiveCText(ReadFile(root / f));
+        for (size_t p = raw.find("#include"); p != std::string::npos; p = raw.find("#include", p + 8)) {
+            const size_t bol = raw.rfind('\n', p);
+            const size_t b0 = bol == std::string::npos ? 0 : bol + 1;
+            if (!Trim(raw.substr(b0, p - b0)).empty()) {
+                continue; // not at the start of a line (a commented-out include)
+            }
+            const size_t eol = std::min(raw.find('\n', p), raw.size());
+            const std::string line = raw.substr(p + 8, eol - p - 8);
+            const size_t q1 = line.find_first_of("\"<");
+            const size_t q2 = q1 == std::string::npos ? q1 : line.find_first_of("\">", q1 + 1);
+            if (q2 == std::string::npos) {
+                continue;
+            }
+            const std::string inc = line.substr(q1 + 1, q2 - q1 - 1);
+            std::vector<fs::path> cands;
+            if (line[q1] == '"') {
+                cands.push_back((root / f).parent_path() / inc);
+            }
+            for (const char* d : { ".", "include", "include/assets", "src" }) {
+                cands.push_back(root / d / inc);
+            }
+            std::string found;
+            for (const fs::path& cand : cands) {
+                if (found.empty() && fs::is_regular_file(cand)) {
+                    found = fs::relative(fs::weakly_canonical(cand), canonRoot).generic_string();
+                }
+            }
+            if (found.empty()) {
+                if (isInc(inc)) {
+                    out.unresolved.push_back(f + ": " + inc);
+                }
+                continue;
+            }
+            if (found.rfind("libultraship/", 0) == 0 || found.rfind("torch/", 0) == 0 ||
+                found.rfind("build-cmake", 0) == 0 || found.rfind("..", 0) == 0) {
+                continue;
+            }
+            if (files.insert(found).second) {
+                todo.push_back(found);
+                out.headers += found.size() > 2 && found.compare(found.size() - 2, 2, ".h") == 0;
+            }
+        }
+    }
+    out.files.assign(files.begin(), files.end());
+    return out;
+}
+
+struct CGlobalsSource {
+    CFileList list;
+    std::vector<CDef> defs;       // unique (symbol, file)
+    std::vector<CMacroUse> macros; // every file-scope macro statement, in file order
+};
+
+CGlobalsSource ScanCGlobalsSource() {
+    CGlobalsSource out;
+    out.list = CompiledCFiles();
+    const std::filesystem::path root = std::filesystem::path(ORACLE_SOURCE_DIR) / "..";
+    std::set<std::pair<std::string, std::string>> seen;
+    for (const std::string& f : out.list.files) {
+        const CFileScan scan = ScanCFile(ReadFile(root / f), f);
+        for (const CDef& d : scan.defs) {
+            if (seen.insert({ d.symbol, d.file }).second) {
+                out.defs.push_back(d);
+            }
+        }
+        out.macros.insert(out.macros.end(), scan.macros.begin(), scan.macros.end());
+    }
+    return out;
+}
+
+const char* kCParserFixture = R"FIX(
+#include "x.h"
+s16 D_1, D_2;
+s32 D_3 = -1;
+const u8 kConstTable[] = { 1, 2 };
+const char* sNames[] = { "a;b", "c" };
+char* const kFixed = 0;
+static s32 sFileStatic;
+Vtx D_4[] = {
+    { { 1, 2 } },
+};
+struct Foo gFoo;
+struct { s32 a; } gAnon;
+typedef struct { s32 b; } Bar;
+struct Tag { s32 c; };
+struct Fwd;
+extern s32 gExtern;
+void proto(s32 a);
+u8 (*gCloudTexture)[1024];
+void (*gCallbacks[2])(void) = { 0, 0 };
+UNUSED s32 D_5;
+u8 sPool[16] ALIGNED8;
+enum Mode gMode;
+s32 *gPtrA, gIntB;
+s32 func(s32 x) {
+    static s32 sLocal = 0;
+    static const s32 kLocal = 1;
+    s32 notStatic = 2;
+    if (x) {
+        static f32 sNested[3];
+    }
+    return x;
+}
+GLOBAL_ASM("asm/x.s")
+s32 D_6;
+// s32 gCommented;
+/* s32 gBlocked; */
+DECLARE_THING(gA)
+DECLARE_THING(gB)
+u8* gAfterMacros[] = { 0 };
+#ifdef __cplusplus
+#include "cpp_only.h"
+s32 gCppOnly;
+#endif
+)FIX";
+
+} // namespace
+
+// The C scanner's own positive control: every construct the game's C files use, on a fixture, definition by definition.
+static void test_cglobal_parser() {
+    std::vector<std::string> got;
+    for (const CDef& d : ScanCDefinitions(kCParserFixture, "fixture.c")) {
+        got.push_back(d.symbol + "@" + d.where.substr(d.where.find(':') + 1));
+    }
+    const std::vector<std::string> want = { "D_1@3",           "D_2@3",           "D_3@4",          "sNames@6",
+                                            "sFileStatic@8",   "D_4@9",           "gFoo@12",        "gAnon@13",
+                                            "gCloudTexture@19", "gCallbacks@20",  "D_5@21",         "sPool@22",
+                                            "gMode@23",        "gPtrA@24",        "gIntB@24",       "func.sLocal@26",
+                                            "func.sNested@30", "D_6@35",          "gAfterMacros@40" };
+    if (got != want) {
+        std::fprintf(stderr, "  C parser fixture definitions:");
+        for (const std::string& g : got) {
+            std::fprintf(stderr, " %s", g.c_str());
+        }
+        std::fprintf(stderr, "\n");
+    }
+    CHECK(got == want);
+    // A file-scope macro invocation with no ';' is its own statement (kart_dma.c's DECLARE_KART_*): it is recorded, and
+    // it does not swallow the definition after it.
+    std::vector<std::string> macros;
+    for (const CMacroUse& m : ScanCFile(kCParserFixture, "fixture.c").macros) {
+        macros.push_back(m.name + "@" + m.where.substr(m.where.find(':') + 1));
+    }
+    const std::vector<std::string> wantMacros = { "DECLARE_THING@38", "DECLARE_THING@39" };
+    if (macros != wantMacros) {
+        std::fprintf(stderr, "  C parser fixture macro invocations:");
+        for (const std::string& m : macros) {
+            std::fprintf(stderr, " %s", m.c_str());
+        }
+        std::fprintf(stderr, "\n");
+    }
+    CHECK(macros == wantMacros);
+    // An #include in an inactive branch is not followed (the include crawler reads ActiveCText's output).
+    CHECK(ActiveCText(kCParserFixture).find("cpp_only.h") == std::string::npos);
+}
+
+namespace {
+
+// The rows of the three tables, keyed (symbol, file); the snapshot's symbols are space-separated.
+std::map<std::pair<std::string, std::string>, std::vector<std::string>> CGlobalRows() {
+    std::map<std::pair<std::string, std::string>, std::vector<std::string>> rows;
+    for (const oracle::CGlobalRow& r : oracle::kCGlobalsHashed) {
+        rows[{ r.symbol, r.file }].push_back("hashed");
+    }
+    for (const oracle::CGlobalRow& r : oracle::kCGlobalsExcluded) {
+        rows[{ r.symbol, r.file }].push_back("excluded");
+    }
+    for (const oracle::CGlobalSnapshot& s : oracle::kCGlobalsNotStored) {
+        for (const std::string& sym : SplitTop(s.symbols, ' ')) {
+            if (!Trim(sym).empty()) {
+                rows[{ Trim(sym), s.file }].push_back(std::string("not-stored:") + s.irClass);
+            }
+        }
+    }
+    return rows;
+}
+
+std::string GroupSite(const std::string& rule) { // "group:<g>" -> the function that hashes the group
+    static const std::pair<const char*, const char*> kSites[] = {
+        { "rng", "HashRng" },         { "race", "HashRace" },       { "players", "HashPlayers" },
+        { "controllers", "HashControllers" }, { "objects", "HashObjects" }, { "cameras", "HashCameras" },
+        { "racearrays", "HashRaceArrays" },   { "world", "World::HashState" } };
+    for (const auto& [g, site] : kSites) {
+        if (rule == std::string("group:") + g) {
+            return site;
+        }
+    }
+    return "";
+}
+
+} // namespace
+
+// "0 unclassified" for the C globals: a definition added later fails here until it is hashed, excluded with a reason, or
+// (if no iteration stores to it) listed in the snapshot with its IR class.
+static void test_cglobal_coverage() {
+    const CGlobalsSource src = ScanCGlobalsSource();
+    const auto rows = CGlobalRows();
+    CHECK(src.list.incFilter);
+    size_t unclassified = 0, duplicated = 0;
+    std::set<std::pair<std::string, std::string>> defs;
+    for (const CDef& d : src.defs) {
+        defs.insert({ d.symbol, d.file });
+        const auto it = rows.find({ d.symbol, d.file });
+        const size_t n = it == rows.end() ? 0 : it->second.size();
+        if (n == 0 && ++unclassified <= 10) {
+            std::fprintf(stderr, "  unclassified C global %s (%s)\n", d.symbol.c_str(), d.where.c_str());
+        }
+        if (n > 1 && ++duplicated <= 10) {
+            std::fprintf(stderr, "  C global %s (%s) is in %zu table rows\n", d.symbol.c_str(), d.where.c_str(), n);
+        }
+        CHECK(n == 1);
+    }
+    if (unclassified > 10) {
+        std::fprintf(stderr, "  … %zu unclassified C globals in all\n", unclassified);
+    }
+    size_t stale = 0;
+    for (const auto& [key, tables] : rows) {
+        if (defs.count(key) == 0 && ++stale <= 10) {
+            std::fprintf(stderr, "  stale C global row %s (%s): no such definition\n", key.first.c_str(), key.second.c_str());
+        }
+        CHECK(defs.count(key) == 1);
+    }
+    for (const oracle::CGlobalRow& r : oracle::kCGlobalsExcluded) {
+        CHECK(r.rule != nullptr && std::strlen(r.rule) > 0);
+    }
+    // Macro statements: each (file, macro) pair is one kCGlobalMacros row with its exact invocation count.
+    std::map<std::pair<std::string, std::string>, int> macroUses;
+    for (const CMacroUse& m : src.macros) {
+        macroUses[{ m.where.substr(0, m.where.rfind(':')), m.name }]++;
+    }
+    for (const auto& [key, n] : macroUses) {
+        int rowUses = -1;
+        for (const oracle::CGlobalMacroRow& r : oracle::kCGlobalMacros) {
+            rowUses = key == std::make_pair(std::string(r.file), std::string(r.macro)) ? r.uses : rowUses;
+        }
+        if (rowUses != n) {
+            std::fprintf(stderr, "  macro statement %s in %s: %d invocations, kCGlobalMacros says %d\n", key.second.c_str(),
+                         key.first.c_str(), n, rowUses);
+        }
+        CHECK(rowUses == n);
+    }
+    for (const oracle::CGlobalMacroRow& r : oracle::kCGlobalMacros) {
+        const bool seen = macroUses.count({ r.file, r.macro }) == 1;
+        if (!seen) {
+            std::fprintf(stderr, "  stale kCGlobalMacros row %s (%s)\n", r.macro, r.file);
+        }
+        CHECK(seen && r.reason != nullptr && std::strlen(r.reason) > 0);
+    }
+    static const char* const kIrClasses[] = { "ESCAPES-only", "NEVER-WRITTEN", "WRITTEN-init-only", "IR-CONSTANT",
+                                              "ABSENT" };
+    for (const oracle::CGlobalSnapshot& s : oracle::kCGlobalsNotStored) {
+        bool known = false;
+        for (const char* k : kIrClasses) {
+            known = known || std::strcmp(s.irClass, k) == 0;
+        }
+        CHECK(known);
+    }
+    // The code hashes what the table says: every kCGlobalsHashed row's name is an identifier in its site's body
+    // (HashCGlobals, or the group's own walk for group:<g>).
+    const CoverageSource code = ScanCoverageSource();
+    std::map<std::string, std::set<std::string>> siteIdents;
+    auto identsOf = [&](const std::string& site) -> const std::set<std::string>* {
+        auto it = siteIdents.find(site);
+        if (it != siteIdents.end()) {
+            return &it->second;
+        }
+        bool defined = false;
+        std::set<std::string> ids;
+        for (const auto& [raw, stripped] : code.code) {
+            const auto [b, e] = FindDefinition(stripped, site);
+            if (b != std::string::npos) {
+                defined = true;
+                for (const std::string& w : Idents(stripped.substr(b, e - b))) {
+                    ids.insert(w);
+                }
+            }
+        }
+        if (!defined) {
+            return nullptr;
+        }
+        return &(siteIdents[site] = ids);
+    };
+    for (const oracle::CGlobalRow& r : oracle::kCGlobalsHashed) {
+        std::string site = GroupSite(r.rule);
+        if (site.empty()) {
+            bool known = false;
+            for (const char* k : oracle::kCGlobalRules) {
+                known = known || std::strcmp(r.rule, k) == 0;
+            }
+            if (!known) {
+                std::fprintf(stderr, "  C global %s: rule \"%s\" is not documented\n", r.symbol, r.rule);
+            }
+            CHECK(known);
+            site = "HashCGlobals";
+        }
+        const std::set<std::string>* ids = identsOf(site);
+        const bool named = ids != nullptr && ids->count(r.symbol) == 1;
+        if (!named) {
+            std::fprintf(stderr, "  C global %s (%s): %s\n", r.symbol, r.file,
+                         ids == nullptr ? ("no definition of " + site).c_str() : ("not hashed by " + site).c_str());
+        }
+        CHECK(named);
+    }
+    // Positive control: the file list and the scanner can see. Measured at ff029646c: 115 .c + 39 .inc.c + 180 game
+    // headers; 3610 definitions, of which the IR (1.4c/globals.py) lists 3589 and holds 8 as constants (13 dropped); the
+    // IR's other 2480 C definitions are kart_dma.c's macro-generated tables (kCGlobalMacros), 40 macro statements.
+    size_t incFiles = 0;
+    for (const std::string& f : src.list.files) {
+        incFiles += f.size() > 6 && f.compare(f.size() - 6, 6, ".inc.c") == 0;
+    }
+    CHECK(src.list.files.size() - incFiles - src.list.headers >= 110 && incFiles >= 35 && src.list.headers >= 150);
+    CHECK(defs.size() >= 3500);
+    CHECK(src.macros.size() == 40);
+    for (const char* f : { "src/main.c", "src/racing/memory.c", "src/buffers/memory_pool.c", "courses/staff_ghost_data.c",
+                           "src/os/guLookAtF.c", "src/racing/actors.c" }) {
+        CHECK(std::find(src.list.files.begin(), src.list.files.end(), f) != src.list.files.end());
+    }
+    CHECK(std::find(src.list.files.begin(), src.list.files.end(), "src/os/osViTable.c") == src.list.files.end());
+    CHECK(defs.count({ "D_801658CE", "src/code_80057C60.c" }) == 1);
+    CHECK(defs.count({ "gRandomSeed16", "src/buffers/random.c" }) == 1);
+    CHECK(defs.count({ "gCollisionGrid", "src/main.c" }) == 1);
+    CHECK(defs.count({ "sMemoryPool", "src/racing/memory.c" }) == 1);
+    CHECK(defs.count({ "sMemoryPool", "src/buffers/memory_pool.c" }) == 1);
+}
+
+// Every HashState / HashStatics owner is CALLED (the tower's W1-W6 survived the member critic: one deleted call line drops
+// a whole class while the member rows still read "0 unclassified").
+static void test_hash_dispatch() {
+    const CoverageSource src = ScanCoverageSource();
+    auto squash = [](const std::string& s) {
+        std::string o;
+        for (char c : s) {
+            if (!std::isspace((unsigned char) c)) {
+                o += c;
+            }
+        }
+        return o;
+    };
+    auto body = [&](const std::string& site) -> std::string { // squashed body of the (single) definition, "" if none
+        std::string out;
+        int found = 0;
+        for (const auto& [raw, stripped] : src.code) {
+            const auto [b, e] = FindDefinition(stripped, site);
+            if (b != std::string::npos) {
+                out = squash(stripped.substr(b, e - b));
+                found++;
+            }
+        }
+        return found == 1 ? out : "";
+    };
+    auto count = [](const std::string& hay, const std::string& needle) {
+        size_t n = 0;
+        for (size_t p = hay.find(needle); p != std::string::npos; p = hay.find(needle, p + 1)) {
+            n++;
+        }
+        return n;
+    };
+    // The owners: every "<Cls>::HashState(" / "<Cls>::HashStatics(" that is a DEFINITION.
+    std::set<std::string> stateOwners, staticsOwners;
+    for (const auto& [raw, stripped] : src.code) {
+        for (const char* fn : { "::HashState(", "::HashStatics(" }) {
+            for (size_t p = stripped.find(fn); p != std::string::npos; p = stripped.find(fn, p + 1)) {
+                size_t b = p;
+                while (b > 0 && IsIdentChar(stripped[b - 1])) {
+                    b--;
+                }
+                const std::string cls = stripped.substr(b, p - b);
+                if (cls == "oracle") {
+                    continue; // oracle::HashState(FieldSink*) is the walk itself (it calls kFns), a namespace, not an owner
+                }
+                const std::string site = cls + std::string(fn).substr(0, std::strlen(fn) - 1);
+                if (!cls.empty() && FindDefinition(stripped, site).first != std::string::npos) {
+                    (std::strcmp(fn, "::HashState(") == 0 ? stateOwners : staticsOwners).insert(cls);
+                }
+            }
+        }
+    }
+    std::map<std::string, std::string> base;
+    for (const SrcClass& c : src.engineClasses) {
+        if (!c.bases.empty()) {
+            base[c.name] = c.bases[0];
+        }
+    }
+    std::map<std::string, const oracle::HashDispatch*> roots;
+    for (const oracle::HashDispatch& d : oracle::kHashDispatch) {
+        roots[d.root] = &d;
+        const std::string b = body(d.site);
+        const size_t n = count(b, squash(d.call));
+        if (n != 1) {
+            std::fprintf(stderr, "  dispatch %s: \"%s\" appears %zu times in %s (want 1)\n", d.root, d.call, n, d.site);
+        }
+        CHECK(n == 1);
+    }
+    for (const std::string& cls : stateOwners) {
+        std::string c = cls;
+        int depth = 0;
+        while (roots.count(c) == 0 && base.count(c) != 0 && depth++ < 16) {
+            c = base[c];
+        }
+        if (roots.count(c) == 0) {
+            std::fprintf(stderr, "  %s::HashState is reached by no kHashDispatch row\n", cls.c_str());
+        }
+        CHECK(roots.count(c) == 1);
+        // An override of a class whose own HashState is DEFINED must call it (or the base's members drop out).
+        std::string b = base.count(cls) != 0 ? base[cls] : "";
+        depth = 0;
+        while (!b.empty() && stateOwners.count(b) == 0 && depth++ < 16) {
+            b = base.count(b) != 0 ? base[b] : "";
+        }
+        if (!b.empty()) {
+            const size_t n = count(body(cls + "::HashState"), b + "::HashState(h)");
+            if (n != 1) {
+                std::fprintf(stderr, "  %s::HashState calls %s::HashState(h) %zu times (want 1)\n", cls.c_str(),
+                             b.c_str(), n);
+            }
+            CHECK(n == 1);
+        }
+    }
+    const std::string world = body("World::HashState");
+    for (const std::string& cls : staticsOwners) {
+        const size_t n = count(world, cls + "::HashStatics(h)");
+        if (n != 1) {
+            std::fprintf(stderr, "  %s::HashStatics is called %zu times in World::HashState (want 1)\n", cls.c_str(), n);
+        }
+        CHECK(n == 1);
+    }
+    // kFns: one defined Hash<Group> per kGroupNames entry, in order.
+    std::vector<std::string> fns;
+    for (const auto& [raw, stripped] : src.code) {
+        const size_t p = stripped.find("kFns[kGroupCount]");
+        if (p == std::string::npos) {
+            continue;
+        }
+        const size_t open = stripped.find('{', p);
+        const size_t close = open == std::string::npos ? std::string::npos : MatchingClose(stripped, open);
+        if (close != std::string::npos) {
+            fns = Idents(stripped.substr(open + 1, close - open - 1));
+        }
+    }
+    CHECK(fns.size() == (size_t) oracle::kGroupCount);
+    for (size_t i = 0; i < fns.size() && i < (size_t) oracle::kGroupCount; i++) {
+        std::string g = fns[i].rfind("Hash", 0) == 0 ? fns[i].substr(4) : "";
+        std::transform(g.begin(), g.end(), g.begin(), [](unsigned char ch) { return (char) std::tolower(ch); });
+        const bool named = g == oracle::kGroupNames[i];
+        const bool defined = !body(fns[i]).empty();
+        if (!named || !defined) {
+            std::fprintf(stderr, "  kFns[%zu] = %s: %s\n", i, fns[i].c_str(),
+                         !named ? "does not name its group" : "has no definition");
+        }
+        CHECK(named && defined);
+    }
+    // Positive control (measured at ff029646c): 34 classes with HashStatics, more than 50 with HashState.
+    CHECK(staticsOwners.size() >= 34);
+    CHECK(stateOwners.size() > 50);
+    CHECK(stateOwners.count("World") == 1 && stateOwners.count("ATruck") == 1 && staticsOwners.count("ABoat") == 1);
+}
+
+static int print_cglobals() {
+    const CGlobalsSource src = ScanCGlobalsSource();
+    for (const CDef& d : src.defs) {
+        std::printf("%s\t%s\t%s\n", d.file.c_str(), d.symbol.c_str(), d.where.c_str());
+    }
+    for (const std::string& u : src.list.unresolved) {
+        std::printf("#unresolved %s\n", u.c_str());
+    }
+    for (const CMacroUse& m : src.macros) {
+        std::printf("#macro %s %s\n", m.name.c_str(), m.where.c_str());
+    }
+    size_t inc = 0;
+    for (const std::string& f : src.list.files) {
+        inc += f.size() > 6 && f.compare(f.size() - 6, 6, ".inc.c") == 0;
+    }
+    std::printf("#files %zu (c %zu, inc.c %zu, headers %zu) definitions %zu macro-statements %zu\n", src.list.files.size(),
+                src.list.files.size() - inc - src.list.headers, inc, src.list.headers, src.defs.size(), src.macros.size());
+    return 0;
+}
+
+// Decision 3's liveness gates (tower condition, 2026-10-27): every owner whose pool CONTENTS the cglobals walk hashes
+// (PutPoolOwner / PutPathOwners / PutVehiclePathOwner with a quoted name, read from the generated TU's source text) has
+// exactly one kPoolGates row, and every row names such an owner — so no gate can go missing or stale silently.
+static void test_pool_gates() {
+    const std::string tu =
+        ReadFile(std::filesystem::path(ORACLE_SOURCE_DIR) / "port" / "oracle" / "OracleCGlobalsHash.cpp");
+    std::set<std::string> owners;
+    for (const char* call : { "PutPoolOwner(h, \"", "PutPathOwners(h, \"", "PutVehiclePathOwner(h, \"" }) {
+        for (size_t p = tu.find(call); p != std::string::npos; p = tu.find(call, p + 1)) {
+            const size_t b = p + std::strlen(call), e = tu.find('"', b);
+            if (e != std::string::npos && e > b) {
+                owners.insert(tu.substr(b, e - b));
+            }
+        }
+    }
+    // Positive control: the probe sees the walk's owners at all.
+    CHECK(owners.size() >= 10 && owners.count("gCollisionMesh") == 1 && owners.count("gTrackPaths") == 1);
+    std::map<std::string, int> rows;
+    for (const oracle::PoolGate& g : oracle::kPoolGates) {
+        rows[g.owner]++;
+        CHECK(g.states != 0 && g.setup != nullptr && std::strlen(g.setup) > 0);
+    }
+    for (const std::string& o : owners) {
+        if (rows[o] != 1) {
+            std::fprintf(stderr, "  pool owner %s has %d kPoolGates rows (want 1)\n", o.c_str(), rows[o]);
+        }
+        CHECK(rows[o] == 1);
+    }
+    for (const auto& [o, n] : rows) {
+        if (owners.count(o) == 0) {
+            std::fprintf(stderr, "  stale kPoolGates row %s: no content owner of that name in the walk\n", o.c_str());
+        }
+        CHECK(owners.count(o) == 1);
+    }
+}
+
+// The C++ global rows (FASE 1.4c.1 e). Their source of truth is the IR sweep, so this is a staleness check, not
+// coverage: each row's file exists and still names the identifier (a src/port/ui row may name a static that one of
+// that directory's headers defines and the file includes), no (file, symbol) is in two rows, and each hashed row is
+// put by name in the generated cglobals walk.
+static void test_cpp_global_rows() {
+    namespace fs = std::filesystem;
+    const fs::path src(ORACLE_SOURCE_DIR);
+    std::string uiHeaders;
+    for (const auto& e : fs::directory_iterator(src / "port" / "ui")) {
+        if (e.path().extension() == ".h") {
+            uiHeaders += ReadFile(e.path());
+        }
+    }
+    // HMAS.cpp compiles miniaudio's implementation, so its globals are defined in that header.
+    const std::string miniaudio = ReadFile(src / ".." / "include" / "audio" / "miniaudio.h");
+    auto ident = [](std::string s) { // "A::f()::x (.1)" -> "x"
+        if (const size_t sp = s.find(" ("); sp != std::string::npos) {
+            s = s.substr(0, sp);
+        }
+        const size_t c = s.rfind("::");
+        return c == std::string::npos ? s : s.substr(c + 2);
+    };
+    std::set<std::pair<std::string, std::string>> seen;
+    size_t n = 0, stale = 0;
+    auto check = [&](const oracle::CppGlobalRow& r) {
+        n++;
+        CHECK(seen.insert({ r.file, r.symbol }).second);
+        CHECK(r.rule != nullptr && std::strlen(r.rule) > 0);
+        const fs::path p = src / ".." / r.file;
+        const std::string text = fs::exists(p) ? ReadFile(p) : "";
+        const std::string id = ident(r.symbol);
+        const bool named = text.find(id) != std::string::npos ||
+                           (std::string(r.file).rfind("src/port/ui/", 0) == 0 && uiHeaders.find(id) != std::string::npos) ||
+                           (std::string(r.file) == "src/port/audio/HMAS.cpp" && miniaudio.find(id) != std::string::npos);
+        if (!named && ++stale <= 10) {
+            std::fprintf(stderr, "  stale C++ global row %s (%s)\n", r.symbol, r.file);
+        }
+        CHECK(named);
+    };
+    for (const auto& r : oracle::kCppGlobalsHashed) {
+        check(r);
+    }
+    for (const auto& r : oracle::kCppGlobalsExcluded) {
+        check(r);
+    }
+    CHECK(n >= 160); // positive control: the generated rows are there (167 at 1.4c)
+    const std::string tu = ReadFile(src / "port" / "oracle" / "OracleCGlobalsHash.cpp");
+    for (const auto& r : oracle::kCppGlobalsHashed) {
+        const std::string put = std::string("put(h, \"") + r.symbol + "\", " + r.symbol + ")";
+        if (tu.find(put) == std::string::npos) {
+            std::fprintf(stderr, "  hashed C++ global %s is not put by name in OracleCGlobalsHash.cpp\n", r.symbol);
+        }
+        CHECK(tu.find(put) != std::string::npos);
+    }
+}
+
+// The table and the walk (OracleCGlobalsHash.cpp) come from one decision list, but nothing else tied them: a row whose
+// statement was dropped from the walk stayed GREEN (executor mutant O8, 2026-10-27). Every kCGlobalsHashed row that no
+// older group hashes must be hashed by name in the walk — `ORACLE_CG(sym)` or a put under "sym".
+static void test_cglobal_walk() {
+    const std::string tu =
+        ReadFile(std::filesystem::path(ORACLE_SOURCE_DIR) / "port" / "oracle" / "OracleCGlobalsHash.cpp");
+    const size_t body = tu.find("void HashCGlobals(Hasher& h) {");
+    CHECK(body != std::string::npos);
+    const std::string walk = body == std::string::npos ? "" : tu.substr(body);
+    size_t n = 0, missing = 0;
+    for (const oracle::CGlobalRow& r : oracle::kCGlobalsHashed) {
+        if (std::string(r.rule).rfind("group:", 0) == 0) {
+            continue;
+        }
+        n++;
+        const std::string s = r.symbol;
+        const bool hashed = walk.find("ORACLE_CG(" + s + ")") != std::string::npos ||
+                            walk.find("(h, \"" + s + "\"") != std::string::npos;
+        if (!hashed && ++missing <= 10) {
+            std::fprintf(stderr, "  kCGlobalsHashed row %s (%s) is not hashed by name in the walk\n", r.symbol, r.file);
+        }
+        CHECK(hashed);
+    }
+    CHECK(n >= 690); // positive control: the walk's rows are there (728 at 1.4c)
 }

@@ -4,8 +4,9 @@
 //   MK64HASH 1
 //   # build=… platform=… buildType=… compiler=… binaryHash=0x…
 //   # tickLogic=2 seed=0x… fpWord=0x… configHash=0x… modListHash=0x… gameArchiveHash=0x… portArchiveHash=0x…
-//   # groups=rng,race,players,controllers,objects,actors,oobjects,cameras,racearrays,world,all   (`world`: FASE 1.4b)
-//   <iter> rng=<16 hex> … world=<16 hex> all=<16 hex>        (one line per PADS record, <iter> from 0, +1 per line)
+//   # groups=rng,race,players,controllers,objects,actors,oobjects,cameras,racearrays,world,cglobals,all
+//                                                      (`world`: FASE 1.4b; `cglobals`: FASE 1.4c)
+//   <iter> rng=<16 hex> … cglobals=<16 hex> all=<16 hex>     (one line per PADS record, <iter> from 0, +1 per line)
 //   END <data lines>                                               (clean shutdown only; absent ⇒ truncated)
 #include "OracleHash.h"
 #include "OracleRecording.h"

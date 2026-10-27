@@ -36,4 +36,10 @@ void resource_display(void);
 
 extern s32 gEnableResourceMeters;
 
+// FASE 1.4c: read by the oracle's HashCGlobals (src/port/oracle); the defining file includes this header,
+// so the compiler checks each declaration against its definition.
+extern s16 D_800DC664; // profiler.c:11
+extern s16 D_800DC668; // profiler.c:12
+extern s16 D_800DC66C; // profiler.c:13
+
 #endif /* PROFILER_H */

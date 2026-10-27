@@ -88,7 +88,7 @@ s32 func_800B6A68(void);
 // these might not be in this file, but for now...
 
 extern u32* gReplayGhostCompressed;
-extern struct_8018EE10_entry D_8018EE10[];
+extern struct_8018EE10_entry D_8018EE10[2]; // FASE 1.4c: bounded for the oracle
 
 extern u16 gCompanyCode;
 extern u32 gGameCode;           // osPfs gamecode

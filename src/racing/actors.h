@@ -120,7 +120,7 @@ extern void func_800C98B8(Vec3f, Vec3f, u32);
 extern void func_800C99E0(Vec3f, s32);
 
 extern struct Actor* gActorHotAirBalloonItemBox;
-extern s8 gTLUTRedShell[]; // tlut 256
+extern s8 gTLUTRedShell[512]; // tlut 256
 extern u16 D_802BA260;     // Box Truck sub-type?
 
 // end of definition of actor.c variables

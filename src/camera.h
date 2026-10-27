@@ -107,7 +107,19 @@ extern s32 D_80164A08[4];
 extern s32 D_80164A28;
 extern s32 D_80164A2C;
 extern f32 D_80164A30;
-extern f32 D_80164A90[];
-extern f32 D_80164AA0[];
+extern f32 D_80164A90[NUM_CAMERAS];
+extern f32 D_80164AA0[NUM_CAMERAS];
+
+// FASE 1.4c: read by the oracle's HashCGlobals (src/port/oracle); the defining file includes this header,
+// so the compiler checks each declaration against its definition.
+extern f32 D_801649D8[NUM_CAMERAS]; // camera.c:38
+extern f32 D_801649E8[NUM_CAMERAS]; // camera.c:39
+extern f32 D_801649F8[NUM_CAMERAS]; // camera.c:40
+extern s32 D_80164A18[NUM_CAMERAS]; // camera.c:42
+extern f32 D_80164A38[NUM_CAMERAS]; // camera.c:47
+extern f32 D_80164A48[NUM_CAMERAS]; // camera.c:48
+extern f32 D_80164A78[NUM_CAMERAS]; // camera.c:49
+extern s8 D_80164A88; // camera.c:50
+extern s32 sStagingTimer[NUM_CAMERAS]; // camera.c:45
 
 #endif

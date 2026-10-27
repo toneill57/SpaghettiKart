@@ -63,20 +63,20 @@ void func_80027024(s32, s32, s32);
 extern struct_D_802F1F80* gPlayerPalette;
 
 extern s32 D_80164A28;
-extern s16 gPlayersToRenderPlayerId[];
+extern s16 gPlayersToRenderPlayerId[8];
 extern s16 D_80164ABE[];
-extern s16 gPlayersToRenderScreenId[];
-extern Player* gPlayersToRenderPlayer[];
+extern s16 gPlayersToRenderScreenId[8];
+extern Player* gPlayersToRenderPlayer[8];
 extern s16 gMatrixEffectCount;
-extern u16 gPlayerRedEffect[];
-extern u16 gPlayerGreenEffect[];
-extern u16 gPlayerBlueEffect[];
-extern u16 gPlayerCyanEffect[];
-extern u16 gPlayerMagentaEffect[];
-extern u16 gPlayerYellowEffect[];
-extern s32 D_80164B80[];
+extern u16 gPlayerRedEffect[8];
+extern u16 gPlayerGreenEffect[8];
+extern u16 gPlayerBlueEffect[8];
+extern u16 gPlayerCyanEffect[8];
+extern u16 gPlayerMagentaEffect[8];
+extern u16 gPlayerYellowEffect[8];
+extern s32 D_80164B80[296];
 
-extern s32 gPlayerStarEffectStartTime[];
+extern s32 gPlayerStarEffectStartTime[8];
 
 extern s32 gPlayersToRenderCount;
 extern void* D_800DDB5C[];

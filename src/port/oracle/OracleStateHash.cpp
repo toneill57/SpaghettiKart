@@ -219,8 +219,9 @@ std::vector<RegistryEntry> RegistryEntries(const Registry<TInfo, TArgs...>& r) {
 
 GroupHashes oracle::HashState(FieldSink* sink) {
     using Fn = void (*)(Hasher&);
-    static constexpr Fn kFns[kGroupCount] = { HashRng,    HashRace,     HashPlayers, HashControllers, HashObjects,
-                                              HashActors, HashOObjects, HashCameras, HashRaceArrays,  HashWorld };
+    static constexpr Fn kFns[kGroupCount] = { HashRng,    HashRace,     HashPlayers,    HashControllers,
+                                              HashObjects, HashActors,  HashOObjects,   HashCameras,
+                                              HashRaceArrays, HashWorld, HashCGlobals };
     GroupHashes out{};
     for (int g = 0; g < kGroupCount; g++) {
         Hasher h(sink);

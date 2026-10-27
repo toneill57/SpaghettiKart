@@ -41,4 +41,13 @@ extern f32 gLapCompletionPercentByPlayerId[];
 extern s32 gGPCurrentRaceRankByPlayerId[]; // D_801643B8 (position for each player)
 extern u16 bCourseGhostDisabled;
 
+// FASE 1.4c: read by the oracle's HashCGlobals (src/port/oracle); the defining file includes this header,
+// so the compiler checks each declaration against its definition.
+extern u16 D_802BA030; // race_logic.c:40
+extern u16 D_802BA032; // race_logic.c:41
+extern float D_802BA034; // race_logic.c:43
+extern s32 D_802BA038; // race_logic.c:45
+extern s16 D_802BA040[4]; // race_logic.c:48
+extern u16 D_802BA048; // race_logic.c:49
+
 #endif

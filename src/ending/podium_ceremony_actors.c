@@ -353,9 +353,11 @@ extern s32 fireworkColour[];
  * resulting in a small variety of amusing colours.
  * D_802874BE appears to be zero.
  */
+// Hoisted from spawn_firework_cone (FASE 1.4c) so the oracle can hash it; never reset between ceremonies.
+u32 D_80287540;
+
 void spawn_firework_cone(s32 arg0, s32 arg1, s32 arg2) {
     f32 num;
-    static u32 D_80287540;
 
     if (((f32) random_float_between_0_and_1() * (D_802874B0[7] + 0xD)) < 1.0f) {
         Firework* cone;

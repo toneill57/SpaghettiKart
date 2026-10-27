@@ -215,4 +215,11 @@ void render_limb_or_add_mtx(Armature*, s16*, AnimationLimbVector, s32);
 void render_armature(Armature*, Animation*, s16);
 s16 render_animated_model(Armature*, Animation**, s16, s16);
 
+// FASE 1.4c: read by the oracle's HashCGlobals (src/port/oracle); the defining file includes this header,
+// so the compiler checks each declaration against its definition.
+extern s16 isNotTheFirst; // animation.c:14
+extern s16 sMatrixShouldNotPop; // animation.c:15
+extern s16 sMatrixStackSize; // animation.c:16
+extern Vec3s sOriginalPosAnimation; // animation.c:13
+
 #endif

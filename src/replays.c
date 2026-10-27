@@ -21,23 +21,23 @@ u8* sReplayGhostBuffer;
 size_t sReplayGhostBufferSize;
 s16 D_80162D86;
 
-static u16 sPlayerGhostButtonsPrev;
-static u32 sPlayerGhostFramesRemaining;
-static s16 sPlayerGhostReplayIdx;
+u16 sPlayerGhostButtonsPrev;
+u32 sPlayerGhostFramesRemaining;
+s16 sPlayerGhostReplayIdx;
 u32* sPlayerGhostReplay;
 
-static u16 sButtonsPrevCourseGhost;
-static u32 sCourseGhostFramesRemaining;
-static s16 sCourseGhostReplayIdx;
-static u32* sCourseGhostReplay;
+u16 sButtonsPrevCourseGhost;
+u32 sCourseGhostFramesRemaining;
+s16 sCourseGhostReplayIdx;
+u32* sCourseGhostReplay;
 
-static u16 sPostTTButtonsPrev;
-static s32 sPostTTFramesRemaining;
-static s16 sPostTTReplayIdx;
-static u32* sPostTTReplay;
+u16 sPostTTButtonsPrev;
+s32 sPostTTFramesRemaining;
+s16 sPostTTReplayIdx;
+u32* sPostTTReplay;
 
-static s16 sPlayerInputIdx;
-static u32* sPlayerInputs;
+s16 sPlayerInputIdx;
+u32* sPlayerInputs;
 
 uintptr_t staff_ghost_track_ptr;
 StaffGhost* D_80162DC4;

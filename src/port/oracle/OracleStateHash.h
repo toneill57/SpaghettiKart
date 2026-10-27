@@ -7,6 +7,10 @@ namespace oracle {
 
 GroupHashes HashState(FieldSink* sink);
 
+// The `cglobals` group (FASE 1.4c, OracleCGlobalsHash.cpp): every kCGlobalsHashed row of OracleCGlobals.h that no older
+// group hashes, in the table's order.
+void HashCGlobals(Hasher& h);
+
 // FNV-1a-64 of the simulation-relevant CVars (kSimCVars, OracleIdentityHash.h) as the game reads them right now.
 // Recorded once in the header (`configHash`) and re-hashed every iteration inside the `race` group.
 uint64_t ConfigHash();

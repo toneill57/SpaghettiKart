@@ -182,13 +182,13 @@ typedef struct {
 extern s32 D_80183DA0;
 
 //! Lakitu?
-extern s32 gIndexLakituList[];
+extern s32 gIndexLakituList[4]; // FASE 1.4c: bounded for the oracle
 
 #define DELETED_OBJECT_ID -1
 #define NULL_OBJECT_ID -1
 
 //! Appears to be a list of object list indices for the Item Window part of the HUD
-extern s32 gItemWindowObjectByPlayerId[];
+extern s32 gItemWindowObjectByPlayerId[8]; // FASE 1.4c: bounded for the oracle
 
 // Used for loop bounds when accessing indexObjectList1
 extern s16 D_80165750;
@@ -270,7 +270,7 @@ extern s16 gNumActiveThwomps;
  * Penguins in Sherbet Land?
  * Flag Poles in Yoshi Valley?
  */
-extern s32 indexObjectList1[];
+extern s32 indexObjectList1[32]; // FASE 1.4c: bounded for the oracle
 
 #define NUM_SEAGULLS 10
 #define NUM_SNOWMEN 19
@@ -299,7 +299,7 @@ extern Vec3s gHedgehogPatrolPoints[];
  * Hedgehogs in Yoshi Valley?
  * Spawn for big fire breath in Bowser's Castle
  */
-extern s32 indexObjectList2[];
+extern s32 indexObjectList2[32]; // FASE 1.4c: bounded for the oracle
 
 #define NUM_BOOS 10
 #define NUM_FIRE_BREATHS 4
@@ -315,12 +315,12 @@ extern s16 D_800E57F8[];
  * Boos in Banshee Boardwalk
  * Spawners for the 4 small fire breaths inside Bowser's Castle
  */
-extern s32 indexObjectList3[];
+extern s32 indexObjectList3[32]; // FASE 1.4c: bounded for the oracle
 
 /**
  * Unused list of object indices
  */
-extern s32 indexObjectList4[];
+extern s32 indexObjectList4[32]; // FASE 1.4c: bounded for the oracle
 
 #define gObjectParticle1_SIZE 128
 #define NUM_GROUP1_MOLES 8
@@ -353,7 +353,7 @@ extern s32 D_8018CF10;
  *   Segments of the fire breath from the statues in Bowser's Castle
  *   Potentially other things
  */
-extern s32 gObjectParticle1[];
+extern s32 gObjectParticle1[gObjectParticle1_SIZE]; // the definition says gObjectParticle2_SIZE: both 128
 
 //! Next free spot in gObjectParticle1? Wraps back around to 0 if it gets bigger than gObjectParticle1_SIZE
 extern s32 gNextFreeObjectParticle1;
@@ -367,7 +367,7 @@ extern s16 D_8018D174;
  * List of object list indices used for:
  *   Bats in Banshee's Boardwalk (but only 1 player mode?)
  */
-extern s32 gObjectParticle2[];
+extern s32 gObjectParticle2[gObjectParticle2_SIZE];
 
 //! Next free spot in gObjectParticle2? Wraps back around to 0 if it gets bigger than gObjectParticle2_SIZE
 extern s32 gNextFreeObjectParticle2;
@@ -376,7 +376,7 @@ extern s32 gNextFreeObjectParticle2;
 extern s32 D_8018D3BC;
 
 #define gObjectParticle3_SIZE 128
-extern s32 gObjectParticle3[];
+extern s32 gObjectParticle3[gObjectParticle3_SIZE];
 //! Next free spot in gObjectParticle3?
 extern s32 gNextFreeObjectParticle3;
 extern s16 D_80165730;
@@ -397,7 +397,7 @@ extern s16 gTorchSpawns[];
  * and, seemingly for the trail that shells leave behind them.
  * I think they're using the same texture, which would explain the dual use
  */
-extern s32 gObjectParticle4[];
+extern s32 gObjectParticle4[gObjectParticle4_SIZE];
 
 //! Next free spot in gObjectParticle4? Wraps back around to 0 if it gets bigger than gObjectParticle4_SIZE
 extern s32 gNextFreeObjectParticle4;
@@ -411,7 +411,7 @@ extern s32 gNextFreeObjectParticle4;
  * Seemingly a list of object list indices used for the leaves that sometimes fall
  * trees when you bonk into them
  */
-extern s32 gLeafParticle[];
+extern s32 gLeafParticle[gLeafParticle_SIZE];
 
 //! Next free spot in gLeafParticle? Wraps back around to 0 if it gets bigger than gLeafParticle_SIZE
 extern s32 gNextFreeLeafParticle;

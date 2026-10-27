@@ -36,6 +36,10 @@ struct AllocOnlyPool {
     u8* freePtr;
 };
 
+// FASE 1.4c (decision 3): the bump pool's size and end, for the oracle's pool-ptr rule (an offset from the end)
+#define MEMORY_POOL_SIZE 0x10000000
+extern uintptr_t sPoolEnd;
+
 #define MEMORY_POOL_LEFT 0
 #define MEMORY_POOL_RIGHT 1
 

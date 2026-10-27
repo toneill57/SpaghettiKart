@@ -17,7 +17,7 @@ typedef struct {
 
 extern TrackPathPoint nullPath;
 extern s16 gAIDistances[];
-extern s16 gMarioRacewayAIDistances[];
+extern s16 gMarioRacewayAIDistances[32]; // FASE 1.4c: bounded for the oracle
 extern s32 D_800DDB20;
 extern s32 D_800DDB24;
 
