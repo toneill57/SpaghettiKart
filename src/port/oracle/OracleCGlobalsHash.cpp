@@ -182,6 +182,28 @@ void PutVehiclePathOwner(Hasher& h, const char* n, const TrackPathPoint* p) {
     PutPoolOwner(h, n, p, count, live);
 }
 
+// Two owners that are allocated WITHOUT being written (FINDING 1.4c.4: the replays of v4b differed in the race's Vtx
+// pointers left in sTKMK00_LowResBuffer's bytes while a menu ran after the race). Their contents are data only once the
+// game has written them since the allocation, which these conditions read from the game's own guards.
+//
+// The transition flag grid: every allocation (menu_items.c:1412, :1510, :2432) resets gTransitionType (:1418, :1514,
+// :2436). Only func_8009E0F0 writes the grid, clearing all 0x4B0 flags as it sets type 3 (:5723-5737), and its only
+// reader, func_8009DB8C (:5591), runs under type 3 (:4960-4961). No other code sets type 3 (:5648 and :5670 take 1, 8, 2, 7).
+bool TransitionGridWritten() {
+    return gTransitionType[4] == 3;
+}
+
+// The GP points copy: filled only in state 0 of the results items MENU_ITEM_TYPE_0AB / 0BA (func_800AC458 :11371-11376,
+// func_800AD2E8 :11776-11781), which then count it down (:11414-11419) and draw it (:7868-7869).
+bool GPPointsCopyFilled() {
+    for (const MenuItem& m : gMenuItems) {
+        if ((m.type == MENU_ITEM_TYPE_0AB || m.type == MENU_ITEM_TYPE_0BA) && m.state != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 void HashCGlobals(Hasher& h) {
@@ -760,14 +782,14 @@ void HashCGlobals(Hasher& h) {
     ORACLE_CG(gTransitionType)
     ORACLE_CG(pfsError)
     ORACLE_CG(pfsState)
-    PutPoolOwner(h, "sGPPointsCopy", sGPPointsCopy, 4);
+    PutPoolOwner(h, "sGPPointsCopy", sGPPointsCopy, 4, Live("sGPPointsCopy") && GPPointsCopyFilled());
     ORACLE_CG(sIntroLogoTimer)
     ORACLE_CG(sIntroModelMotionSpeed)
     ORACLE_CG(sIntroModelSpeed)
     ORACLE_CG(sMenuTextureEntries)
     ORACLE_CG(sMenuTextureListIndex)
     ORACLE_CG(sMenuTextureMap)
-    PutPoolOwner(h, "sTKMK00_LowResBuffer", sTKMK00_LowResBuffer, 0x4B0); // the flag grid, :5603-5734
+    PutPoolOwner(h, "sTKMK00_LowResBuffer", sTKMK00_LowResBuffer, 0x4B0, Live("sTKMK00_LowResBuffer") && TransitionGridWritten()); // the flag grid, :5603-5734
     // src/menus.c
     ORACLE_CG(gBattleResultCursorSelection)
     ORACLE_CG(gCharacterGridIsSelected)
