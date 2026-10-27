@@ -595,7 +595,6 @@ inline constexpr CGlobalRow kCGlobalsHashed[] = {
     { "gControllerBits", "src/main.c", "scalar" },
     { "gControllerPads", "src/main.c", "scalar" },
     { "gControllerStatuses", "src/main.c", "scalar" },
-    { "gDeltaTime", "src/main.c", "scalar" },
     { "gDemoMode", "src/main.c", "scalar" },
     { "gEnableDebugMode", "src/main.c", "scalar" },
     { "gGotoMode", "src/main.c", "scalar" },
@@ -2274,6 +2273,15 @@ inline constexpr CGlobalRow kCGlobalsExcluded[] = {
       "libultra OS bookkeeping: OS bookkeeping: the only escape is the stack pointer given to create_thread -> "
       "osCreateThread (main.c:1039,203), an empty stub (stubs.c:52), inside thread3_video, which the port never "
       "starts (main_func has no caller, main.c:206). No store, no reader. (ESCAPES-only; wave 2, E4)" },
+    { "gDeltaTime", "src/main.c",
+      "host-dependent: Written every iteration by calculate_delta_time (src/main.c:314-334, called at :1163) "
+      "from osGetCount, which is std::chrono::steady_clock (libultraship os.cpp:49-52): the host frame delta, "
+      "different on every run. Its only reader is freecam_tick "
+      "(src/enhancements/freecam/freecam_engine.c:25-37), reached only through freecam_loop "
+      "(freecam.cpp:115-137) from FreeCamera::Tick while bActive (FreeCamera.cpp:36-44); freecam is refused in "
+      "oracle mode (OracleGuards.cpp:16-19, main.c:357). FINDING 1.4c.4: hashed first by the scalar default, it "
+      "made two replays of one recording differ on 1348 of 1350 iterations; a field dump named it as the only "
+      "differing field." },
     { "gDisplayListHead", "src/main.c",
       "render-only: Pure render cursor: all 2300+ sites emit display-list words; no sim/menu logic reads it. "
       "Its value depends on host state (cvars, aspect ratio command counts), so hashing it would import host "

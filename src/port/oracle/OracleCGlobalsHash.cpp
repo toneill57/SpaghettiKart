@@ -715,7 +715,6 @@ void HashCGlobals(Hasher& h) {
     ORACLE_CG(gControllerBits)
     ORACLE_CG(gControllerPads)
     ORACLE_CG(gControllerStatuses)
-    ORACLE_CG(gDeltaTime)
     ORACLE_CG(gDemoMode)
     ORACLE_CG(gEnableDebugMode)
     ORACLE_CG(gGotoMode)
