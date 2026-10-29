@@ -184,6 +184,34 @@ inline constexpr HashSite kHashSites[] = {
     { "TourCamera::KeyFrame", "Track::HashState" },
 };
 
+// FASE 1.4c: how each HashState owner is REACHED. The member critic above proves a row's put() sits in its owner's body;
+// it cannot see the owner's call being deleted (tower mutants W1-W6). oracle_tests (test_hash_dispatch) requires: every
+// class with a HashState definition has itself or an ancestor here, and that row's `call` appears exactly once in its
+// `site`'s body; every HashStatics owner is called exactly once in World::HashState; an override of a class whose own
+// HashState is defined calls `<Base>::HashState(h)`; and kFns names one defined Hash<Group> per kGroupNames entry.
+struct HashDispatch {
+    const char* root; // the class whose HashState (and its overrides') the call reaches
+    const char* site; // the function that makes the call
+    const char* call; // the call, as written (whitespace-insensitive)
+};
+inline constexpr HashDispatch kHashDispatch[] = {
+    { "AActor", "HashActors", "a.HashState(h)" },
+    { "OObject", "HashOObjects", "o.HashState(h)" },
+    { "World", "HashWorld", "w->HashState(h)" },
+    { "Track", "World::HashState", "mTrack->HashState(h)" },
+    { "Cup", "World::HashState", "Cups[i]->HashState(h)" },
+    { "GameCamera", "World::HashState", "Cameras[i]->HashState(h)" },
+    { "StaticMeshActor", "World::HashState", "StaticMeshActors[i]->HashState(h)" },
+    { "ParticleEmitter", "World::HashState", "Emitters[i]->HashState(h)" },
+    { "PlayerBombKart", "World::HashState", "mPlayerBombKart[i].HashState(h)" },
+    { "TrainCrossing", "World::HashState", "Crossings[i]->HashState(h)" },
+    { "RaceManager", "World::HashState", "RaceManagerInstance->HashState(h)" },
+    { "Sky", "World::HashState", "Sky::Instance->HashState(h)" },
+    { "TrackBrowser", "World::HashState", "TrackBrowser::Instance->HashState(h)" },
+    { "SkyActor", "Sky::HashState", "mSkyActors[i]->HashState(h)" },
+    { "RandomItemTable", "RaceManager::HashState", "t->HashState(h)" },
+};
+
 // Statics outside the class tables: file-scope / function-local statics of src/engine and src/port/oracle .cpp files,
 // and the class statics of classes outside kCoverageHeaders. `file` is the defining file (or the header, for a class
 // static); kStaticsHashed's `rule` is the function that hashes it, kStaticsExcluded's the reason.

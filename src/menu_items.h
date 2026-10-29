@@ -672,7 +672,7 @@ extern u8* sTKMK00_LowResBuffer;
 extern u8* sGPPointsCopy;
 extern void* gSomeDLBuffer;
 extern s8 gGPPointsByCharacterId[8];
-extern s8 gCharacterIdByGPOverallRank[];
+extern s8 gCharacterIdByGPOverallRank[8];
 extern s8 D_8018D9D8;
 extern s8 D_8018D9D9;
 extern MenuItem gMenuItems[MENU_ITEMS_MAX];
@@ -686,19 +686,19 @@ extern Gfx* sGfxPtr;
 extern s32 gNumD_8018E768Entries;
 extern struct_8018E768_entry D_8018E768[D_8018E768_SIZE];
 extern s32 gCycleFlashMenu;
-extern s8 gTransitionType[];
-extern u32 gTransitionDuration[];
-extern u32 gCurrentTransitionTime[];
+extern s8 gTransitionType[5];
+extern u32 gTransitionDuration[5];
+extern u32 gCurrentTransitionTime[5];
 extern struct UnkStruct_8018E7E8 D_8018E7E8[D_8018E7E8_SIZE];
 extern struct UnkStruct_8018E7E8 D_8018E810[D_8018E810_SIZE];
 extern s8 gTextColor;
 extern u8 D_8018ED90;
 extern u8 D_8018ED91;
-extern s8 D_8018E838[];
-extern s32 D_8018E840[];
-extern s32 D_8018E850[];
+extern s8 D_8018E838[4];
+extern s32 D_8018E840[4];
+extern s32 D_8018E850[2];
 extern s32 D_8018E854;
-extern s32 D_8018E858[];
+extern s32 D_8018E858[2];
 extern s32 D_8018E85C;
 
 // extern u8 _textures_0aSegmentRomStart[];
@@ -857,5 +857,9 @@ extern f32 D_8018EDAC;
 #ifdef __cplusplus
 }
 #endif
+
+// FASE 1.4c: read by the oracle's HashCGlobals (src/port/oracle); the defining file includes this header,
+// so the compiler checks each declaration against its definition.
+extern s32 sIntroLogoTimer; // menu_items.c:113
 
 #endif

@@ -23,6 +23,7 @@ extern "C" {
 #include "vehicles.h"                 // TrainCarStuff (FASE 1.4b)
 #include "data/path_spawn_metadata.h" // TrackPathSizes (FASE 1.4b)
 #include "code_800029B0.h"             // ScreenContext (FASE 1.4b: SkyActor::mScreen)
+#include "waypoints.h"                 // TrackPathPoint (FASE 1.4c: the pool's path arrays)
 }
 
 class OObject;
@@ -98,6 +99,14 @@ class ParticleEmitter;
 #define ORACLE_TRACKPATHSIZES_FIELDS(F) F(unk0) F(unk2) F(unk4) F(unk6) F(unk8) F(padA)
 // libultraship gbi.h (Vtx = union { Vtx_t v; … })
 #define ORACLE_VTX_T_FIELDS(F) F(ob) F(flag) F(tc) F(cn)
+// FASE 1.4c (decision 3: the live pool allocations, field-wise through their owners). include/waypoints.h
+#define ORACLE_TRACKPATHPOINT_FIELDS(F) F(x) F(y) F(z) F(trackSectionId)
+// include/common_structs.h — vtx1, vtx2, vtx3 are NOT in the list: they name the track's display-list vertices (asset
+// data, set_vtx_buffer collision.c:1779, or the mirror-mode copies RaceManager.cpp:22-46 makes from them), which the
+// simulation only reads (v.ob, collision.c:1553-1561); the one writer is the debug collision viewer's colour
+// (collision_viewer.c:53-61). The triangle's own bounds, normal and distance are its simulation view of them.
+#define ORACLE_COLLISIONTRIANGLE_FIELDS(F) \
+    F(flags) F(surfaceType) F(minX) F(minY) F(minZ) F(maxX) F(maxY) F(maxZ) F(normalX) F(normalY) F(normalZ) F(distance)
 
 namespace oracle {
 
@@ -120,6 +129,8 @@ ORACLE_STRUCT(RGB8, ORACLE_RGB8_FIELDS)
 ORACLE_STRUCT(TrainCarStuff, ORACLE_TRAINCARSTUFF_FIELDS)
 ORACLE_STRUCT(TrackPathSizes, ORACLE_TRACKPATHSIZES_FIELDS)
 ORACLE_STRUCT(Vtx_t, ORACLE_VTX_T_FIELDS)
+ORACLE_STRUCT(TrackPathPoint, ORACLE_TRACKPATHPOINT_FIELDS)
+ORACLE_STRUCT(CollisionTriangle, ORACLE_COLLISIONTRIANGLE_FIELDS)
 
 // The colour view: every Vtx this hash reaches is built as Vtx_t.
 inline void put(Hasher& h, const char* n, const Vtx& s) {
@@ -213,3 +224,9 @@ static_assert(sizeof(Camera) - offsetof(Camera, lookAtMatrix) == sizeof(void*),
 static_assert(sizeof(TrainCarStuff) == 0x24 && offsetof(TrainCarStuff, unused) == 0x20,
               "TrainCarStuff changed: re-check ORACLE_TRAINCARSTUFF_FIELDS against the record layout");
 static_assert(sizeof(TrackPathSizes) == 0x10, "TrackPathSizes changed: re-check ORACLE_TRACKPATHSIZES_FIELDS");
+static_assert(sizeof(TrackPathPoint) == 8 && offsetof(TrackPathPoint, trackSectionId) == 6,
+              "TrackPathPoint changed: re-check ORACLE_TRACKPATHPOINT_FIELDS");
+static_assert(offsetof(CollisionTriangle, vtx1) == 0x10 &&
+                  offsetof(CollisionTriangle, normalX) == 0x10 + 3 * sizeof(void*) &&
+                  sizeof(CollisionTriangle) == offsetof(CollisionTriangle, distance) + sizeof(f32),
+              "CollisionTriangle changed: re-check ORACLE_COLLISIONTRIANGLE_FIELDS");

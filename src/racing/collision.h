@@ -40,4 +40,8 @@ void set_vertex_colours(uintptr_t, u32, s32, s8, u8, u8, u8);
 void find_vtx_and_set_colours(Gfx*, s8, u8, u8, u8);
 void subtract_scaled_vector(Vec3f, f32, Vec3f);
 
+// FASE 1.4c: read by the oracle's HashCGlobals (src/port/oracle); the defining file includes this header,
+// so the compiler checks each declaration against its definition.
+extern u32 numTimes; // collision.c:2013
+
 #endif

@@ -33,4 +33,8 @@ extern Lights1 D_800DC610[];
 
 extern u16 gNumCollisionTriangles;
 
+// FASE 1.4c: read by the oracle's HashCGlobals (src/port/oracle); the defining file includes this header,
+// so the compiler checks each declaration against its definition.
+extern s16 currentScreenSection; // render_courses.c:41
+
 #endif

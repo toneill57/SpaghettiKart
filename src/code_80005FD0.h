@@ -298,68 +298,68 @@ extern struct Collision D_80162E70;
 extern s16 D_80162EB0; // Possibly a float.
 extern s16 D_80162EB2; // possibly [3]
 extern CPUBehaviour* gCoursesCPUBehaviour[];
-extern s16 D_80162F10[];
-extern s16 D_80162F50[];
+extern s16 D_80162F10[30];
+extern s16 D_80162F50[30];
 extern Vec3f gOffsetPosition;
 extern Vec3f D_80162FB0;
 extern Vec3f D_80162FC0;
 extern s16 gTrainSmokeTimer;
 extern s16 D_80162FD0;
-extern f32 gCourseCompletionPercentByRank[]; // D_80162FD8
-extern s16 D_80162FF8[];
-extern s16 D_80163010[];
-extern f32 cpu_TargetSpeed[];
-extern s16 gPreviousAngleSteering[];
-extern f32 D_80163090[];
-extern bool gIsPlayerInCurve[];
+extern f32 gCourseCompletionPercentByRank[NUM_PLAYERS]; // D_80162FD8
+extern s16 D_80162FF8[12];
+extern s16 D_80163010[12];
+extern f32 cpu_TargetSpeed[10];
+extern s16 gPreviousAngleSteering[12];
+extern f32 D_80163090[10];
+extern bool gIsPlayerInCurve[10];
 extern u16 gCurrentNearestPathPoint;
 extern s16 gIsPlayerNewPathPoint;
-extern s16 D_801630E8[];
+extern s16 D_801630E8[10];
 extern s16 gFerrySmokeTimer;
-extern s32 D_80163100[];
-extern s32 D_80163128[];
-extern s32 D_80163150[];
-extern f32 gPreviousPlayerAiOffsetX[];
-extern f32 gPreviousPlayerAiOffsetZ[];
+extern s32 D_80163100[10];
+extern s32 D_80163128[10];
+extern s32 D_80163150[10];
+extern f32 gPreviousPlayerAiOffsetX[10];
+extern f32 gPreviousPlayerAiOffsetZ[10];
 extern s16 sVehicleSoundRenderCounter;
 extern s32 D_801631CC;
-extern u16 D_801631E0[];
-extern u16 D_801631F8[];
+extern u16 D_801631E0[12];
+extern u16 D_801631F8[10];
 extern f32 gCurrentCpuTargetSpeed;
-extern f32 gPreviousCpuTargetSpeed[];
+extern f32 gPreviousCpuTargetSpeed[10];
 extern s32 D_80163238;
-extern u16 D_80163240[];
+extern u16 D_80163240[12];
 extern u16 gWrongDirectionCounter[];
 extern u16 gIsPlayerWrongDirection[];
 extern s32 gPreviousLapProgressScore[];
 extern CPUBehaviour* sCurrentCPUBehaviour;
 extern u16 gCurrentCPUBehaviourId[];
-extern u16 gPreviousCPUBehaviourId[];
+extern u16 gPreviousCPUBehaviourId[12];
 extern u16 cpu_BehaviourState[];
 
 enum { CPU_BEHAVIOUR_STATE_NONE, CPU_BEHAVIOUR_STATE_START, CPU_BEHAVIOUR_STATE_RUNNING };
 
-extern s16 sPlayerAngle[];
-extern u16 D_80163330[];
-extern u16 D_80163344[];
-extern u16 D_80163348[];
-extern u16 D_8016334C[];
+extern s16 sPlayerAngle[12];
+extern u16 D_80163330[10];
+extern u16 D_80163344[2];
+extern u16 D_80163348[2];
+extern u16 D_8016334C[8];
 extern u16 gSpeedCPUBehaviour[];
 
 enum { SPEED_CPU_BEHAVIOUR_NORMAL, SPEED_CPU_BEHAVIOUR_FAST, SPEED_CPU_BEHAVIOUR_SLOW, SPEED_CPU_BEHAVIOUR_MAX };
 
 extern s32 gIncrementUpdatePlayer;
-extern s16 gCurrentPlayerLookAhead[];
-extern s16 D_80163398[];
-extern s16 D_801633B0[];
-extern s16 D_801633C8[];
-extern s16 D_801633E0[];
-extern s16 D_801633F8[];
-extern s16 D_80163410[];
-extern f32 D_80163418[];
-extern f32 D_80163428[];
-extern f32 D_80163438[];
-extern f32 gPreviousPlayerZ[];
+extern s16 gCurrentPlayerLookAhead[12];
+extern s16 D_80163398[12];
+extern s16 D_801633B0[12];
+extern s16 D_801633C8[12];
+extern s16 D_801633E0[12];
+extern s16 D_801633F8[12];
+extern s16 D_80163410[4];
+extern f32 D_80163418[4];
+extern f32 D_80163428[4];
+extern f32 D_80163438[4];
+extern f32 gPreviousPlayerZ[10];
 extern s16 gBestRankedHumanPlayer;
 // 0 or 1, only 1 when when in extra (mirror) mode
 extern s16 gIsInExtra;
@@ -369,57 +369,57 @@ extern s32 D_80163480;
 extern s32 D_80163484;
 extern s32 D_80163488;
 extern s16 D_8016348C;
-extern s16 D_801634C0[];
-extern s16 bStopAICrossing[];
+extern s16 D_801634C0[12];
+extern s16 bStopAICrossing[10];
 extern s16 D_801634EC;
 extern s32 D_801634F0;
 extern s32 D_801634F4;
-extern TrackPositionFactorInstruction gPlayerTrackPositionFactorInstruction[];
+extern TrackPositionFactorInstruction gPlayerTrackPositionFactorInstruction[10]; // FASE 1.4c: bounded for the oracle
 extern TrackPathPoint* gVehicle2DPathPoint;
 extern s32 gVehicle2DPathSize;
 extern TrackPathPoint* gVehiclePath;
 extern size_t gVehiclePathSize;
 extern u16 isCrossingTriggeredByIndex[];
-extern u16 sCrossingActiveTimer[];
-extern s32 D_80163DD8[];
-extern struct unexpiredActors gUnexpiredActorsList[];
-extern CpuItemStrategyData cpu_ItemStrategy[];
+extern u16 sCrossingActiveTimer[NUM_CROSSINGS];
+extern s32 D_80163DD8[4];
+extern struct unexpiredActors gUnexpiredActorsList[8]; // FASE 1.4c: bounded for the oracle
+extern CpuItemStrategyData cpu_ItemStrategy[8]; // FASE 1.4c: bounded for the oracle
 extern s16 D_80164358;
 extern s16 D_8016435A;
 extern s16 D_8016435C;
 extern s16 gGPCurrentRacePlayerIdByRank[]; // D_80164360
-extern s16 D_80164378[];
+extern s16 D_80164378[12];
 extern s32 gLapCountByPlayerId[];          // D_80164390
 extern s32 gGPCurrentRaceRankByPlayerId[]; // D_801643B8
 extern s32 gPreviousGPCurrentRaceRankByPlayerId[];
-extern s32 gGPCurrentRaceRankByPlayerIdDup[];
-extern s16 gGetPlayerByCharacterId[];
+extern s32 gGPCurrentRaceRankByPlayerIdDup[10];
+extern s16 gGetPlayerByCharacterId[10];
 extern s32 D_8016448C;
-extern f32 D_80164498[];
+extern f32 D_80164498[4];
 extern f32 gLapCompletionPercentByPlayerId[];    // D_801644A8
 extern f32 gCourseCompletionPercentByPlayerId[]; // D_801644D0
-extern f32 gPlayerPathY[];
-extern s16 D_80164538[];
-extern s32 D_801645D0[];
-extern s32 D_801645E8[];
-extern f32 D_801645F8[];
-extern s32 D_80164608[];
-extern f32 D_80164618[];
-extern s32 D_80164628[];
-extern f32 D_80164638[];
-extern f32 D_80164648[];
-extern f32 D_80164658[];
-extern s16 D_80164670[];
-extern s16 D_80164678[];
-extern s16 D_80164680[];
-extern f32 D_80164688[];
+extern f32 gPlayerPathY[10];
+extern s16 D_80164538[12];
+extern s32 D_801645D0[NUM_CAMERAS];
+extern s32 D_801645E8[NUM_CAMERAS];
+extern f32 D_801645F8[NUM_CAMERAS];
+extern s32 D_80164608[NUM_CAMERAS];
+extern f32 D_80164618[NUM_CAMERAS];
+extern s32 D_80164628[NUM_CAMERAS];
+extern f32 D_80164638[NUM_CAMERAS];
+extern f32 D_80164648[NUM_CAMERAS];
+extern f32 D_80164658[NUM_CAMERAS];
+extern s16 D_80164670[NUM_CAMERAS];
+extern s16 D_80164678[NUM_CAMERAS];
+extern s16 D_80164680[NUM_CAMERAS];
+extern f32 D_80164688[NUM_CAMERAS];
 extern f32 D_80164698;
 extern f32 D_8016469C;
 extern f32 D_801646A0;
-extern s16 D_801646C0[];
+extern s16 D_801646C0[NUM_CAMERAS];
 extern u32 D_801646C8;
 extern u16 D_801646CC;
-extern UnkStruct_46D0 D_801646D0[];
+extern UnkStruct_46D0 D_801646D0[16]; // FASE 1.4c: NUM_CAMERAS, not visible here
 
 // See bss_80005FD0.s
 extern f32 gCourseCompletionPercentByRank[NUM_PLAYERS];
@@ -434,5 +434,9 @@ extern u16 D_80163E2A;
 #define WRONG_DIRECTION_FRAMES_LIMIT 5
 
 // extern Gfx D_0D0076F8[];
+
+// FASE 1.4c: read by the oracle's HashCGlobals (src/port/oracle); the defining file includes this header,
+// so the compiler checks each declaration against its definition.
+extern bool gLookBehindActive[16]; // code_80005FD0.c; NUM_CAMERAS (camera.h), not visible here
 
 #endif

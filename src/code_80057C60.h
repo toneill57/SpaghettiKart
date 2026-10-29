@@ -279,7 +279,7 @@ extern s32 D_80165618;
 extern s32 D_80165628;
 extern u32 D_80165638;
 extern u32 D_80165648;
-extern u32 D_80165658[];
+extern u32 D_80165658[8];
 extern s32 D_80165678;
 extern u16 D_801656B0;
 extern u16 D_801656C0;
@@ -314,9 +314,9 @@ extern s8 D_801657AE;
 extern s8 gHUDDisable;
 extern s8 D_801657B2;
 extern s8 D_801657B4;
-extern s8 D_801657B8[];
+extern s8 D_801657B8[16];
 extern s8 D_801657C8;
-extern s8 D_801657D0[];
+extern s8 D_801657D0[8];
 extern s8 D_801657D8;
 extern s8 D_801657E1;
 extern s8 D_801657E2;
@@ -343,7 +343,7 @@ extern s8 D_80165828;
 extern Vec3su D_8016582C;
 extern s8 D_80165832[2];
 extern Vec3su D_80165834;
-extern s8 D_80165840[];
+extern s8 D_80165840[3];
 extern s32 D_80165860;
 extern s32 D_8016586C;
 extern s32 D_80165878;
@@ -375,10 +375,10 @@ extern s32 objectListSize;
 extern Mtx D_80183D60;
 // extern s32 D_80183DA0; -> objects.h
 
-extern f32 D_80183DA8[];
+extern f32 D_80183DA8[4];
 // extern s32 gIndexLakituList[]; -> objects.h
 
-extern f32 D_80183DC8[];
+extern f32 D_80183DC8[4];
 // extern s32 gIndexObjectBombKart[]; -> bomb_kart.h
 // extern s32 gNextFreeObjectParticle1; -> objects.h
 
@@ -415,10 +415,10 @@ extern struct Collision D_8018C830;
 // extern s32 gObjectParticle4[]; -> objects.h
 // extern s32 gLeafParticle[]; -> objects.h
 
-extern hud_player playerHUD[];
+extern hud_player playerHUD[4]; // FASE 1.4c: bounded for the oracle
 // extern s32 D_8018CC80[]; -> objects.h
 
-extern struct_D_8018CE10 D_8018CE10[];
+extern struct_D_8018CE10 D_8018CE10[8]; // FASE 1.4c: bounded for the oracle
 // extern s32 D_8018CF10; -> objects.h
 
 extern Camera* D_8018CF14;
@@ -427,15 +427,15 @@ extern Player* D_8018CF1C;
 extern s16 D_8018CF20;
 extern Player* D_8018CF28[];
 extern s16 D_8018CF48;
-extern s16 D_8018CF50[];
+extern s16 D_8018CF50[8];
 extern s16 D_8018CF60;
-extern s16 D_8018CF68[];
+extern s16 D_8018CF68[8];
 extern s16 D_8018CF78;
-extern s16 gGPCurrentRaceCharacterIdByRank[];
+extern s16 gGPCurrentRaceCharacterIdByRank[8];
 extern f32 D_8018CFCC;
 extern f32 D_8018CFD4;
 extern s16 D_8018CF90;
-extern s16 D_8018CF98[];
+extern s16 D_8018CF98[8];
 extern s16 D_8018CFA8;
 extern s16 D_8018CFB0;
 extern s16 D_8018CFB8;
@@ -443,10 +443,10 @@ extern s16 D_8018CFC0;
 extern s16 D_8018CFC8;
 extern s16 D_8018CFD0;
 extern s16 D_8018CFD8;
-extern s8 D_8018CFAC[];
-extern s8 D_8018CFB4[];
-extern s8 D_8018CFBC[];
-extern s8 D_8018CFC4[];
+extern s8 D_8018CFAC[4];
+extern s8 D_8018CFB4[4];
+extern s8 D_8018CFBC[4];
+extern s8 D_8018CFC4[4];
 extern s16 D_8018CFE0;
 extern f32 D_8018CFE4;
 extern s16 D_8018CFE8;
@@ -461,17 +461,17 @@ extern s16 D_8018D010;
 extern s16 D_8018D018;
 extern f32 xOrientation;
 extern s16 D_8018D020;
-extern f32 D_8018D028[];
+extern f32 D_8018D028[8];
 extern s16 D_8018D048;
-extern f32 D_8018D050[];
+extern f32 D_8018D050[8];
 extern s16 D_8018D070;
-extern f32 D_8018D078[];
+extern f32 D_8018D078[8];
 extern s16 D_8018D098;
-extern f32 D_8018D0A0[];
+extern f32 D_8018D0A0[8];
 extern s16 D_8018D0C0;
-extern f32 D_8018D0C8[];
+extern f32 D_8018D0C8[8];
 extern s16 D_8018D0E8;
-extern f32 D_8018D0F0[];
+extern f32 D_8018D0F0[8];
 extern s16 D_8018D110;
 extern s32 D_8018D114;
 extern s32 gMatrixHudCount;
@@ -540,7 +540,7 @@ extern s32 D_8018D2B4;
 extern s16 gMinimapHeight;
 extern s32 D_8018D2BC;
 extern s16 gMinimapX[];
-extern s32 D_8018D2C8[];
+extern s32 D_8018D2C8[4];
 extern s16 gMinimapY[];
 extern s16 gMinimapPlayerX;
 extern s16 gMinimapPlayerY;
@@ -599,25 +599,25 @@ extern u8* D_8018D4BC;
 extern u8* D_8018D4C0;
 extern u8* gTextureLoadedLightningBolt0;
 extern u8* gTextureLoadedLightningBolt1;
-extern Vec3f gPlayerBalloonPosX[];
-extern Vec3f gPlayerBalloonPosY[];
-extern Vec3f gPlayerBalloonPosZ[];
+extern Vec3f gPlayerBalloonPosX[8];
+extern Vec3f gPlayerBalloonPosY[8];
+extern Vec3f gPlayerBalloonPosZ[8];
 extern u16 gPlayerBalloonStatus[8][3];
-extern Vec3s D_8018D620[];
-extern Vec3f D_8018D650[];
-extern Vec3f D_8018D6B0[];
+extern Vec3s D_8018D620[8];
+extern Vec3f D_8018D650[8];
+extern Vec3f D_8018D6B0[8];
 
-extern Vec3f D_8018D710[];
-extern Vec3s D_8018D770[];
-extern Vec3s D_8018D7A0[];
-extern Vec3s D_8018D7D0[];
+extern Vec3f D_8018D710[8];
+extern Vec3s D_8018D770[8];
+extern Vec3s D_8018D7A0[8];
+extern Vec3s D_8018D7D0[8];
 
-extern Vec3s D_8018D800[];
-extern Vec3s D_8018D830[];
-extern Vec3s D_8018D860[];
-extern Vec3s D_8018D890[];
-extern s16 gPlayerBalloonCount[]; // D_8018D8C0
-extern Vec3s gPlayerBalloonDepartingTimer[];
+extern Vec3s D_8018D800[8];
+extern Vec3s D_8018D830[8];
+extern Vec3s D_8018D860[8];
+extern Vec3s D_8018D890[8];
+extern s16 gPlayerBalloonCount[8]; // D_8018D8C0
+extern Vec3s gPlayerBalloonDepartingTimer[8];
 
 /** @endcond */
 

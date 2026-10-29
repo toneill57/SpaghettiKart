@@ -115,7 +115,7 @@ void setup_podium_ceremony(void) {
     gActiveScreenMode = SCREEN_MODE_1P;
     gModeSelection = GRAND_PRIX;
     load_track(gCurrentCourseId);
-    gFreeMemoryCourseAnchor = (s32) gNextFreeMemoryAddress;
+    gFreeMemoryCourseAnchor = gNextFreeMemoryAddress;
     gWaterLevel = -2000.0f;
 
     gTrackMinX = -0x15A1;

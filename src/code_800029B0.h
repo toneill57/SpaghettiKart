@@ -132,11 +132,11 @@ extern Vec3f D_8015F778;
 extern f32 gTrackDirection;
 extern s32 gNumScreens;
 
-extern s32 D_8015F790[];
+extern s32 D_8015F790[64]; // FASE 1.4c: bounded for the oracle
 extern u16 D_8015F890;
 extern u16 D_8015F892;
 extern u16 D_8015F894;
-extern f32 gTimePlayerLastTouchedFinishLine[];
+extern f32 gTimePlayerLastTouchedFinishLine[8]; // NUM_PLAYERS (defines.h), not visible here
 
 extern u8* gNmiUnknown1;
 extern u8* gNmiUnknown2;
@@ -151,7 +151,7 @@ extern s32 D_8015F8DC;
 extern s32 D_8015F8E0;
 extern f32 gWaterLevel;
 extern f32 gWaterVelocity;
-extern s16 gPlayerPositionLUT[]; // Player index at each position
+extern s16 gPlayerPositionLUT[8]; // Player index at each position
 extern u16 gNumPermanentActors;
 
 extern UNUSED u8 D_80162578[];

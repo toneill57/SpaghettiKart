@@ -233,10 +233,12 @@ enum Group : int {
     kCameras,
     kRaceArrays,
     kWorld,
+    kCGlobals, // FASE 1.4c: the mutable C globals an iteration stores to (OracleCGlobals.h); appended last
     kGroupCount
 };
-inline constexpr const char* kGroupNames[kGroupCount] = { "rng",     "race",     "players", "controllers", "objects",
-                                                          "actors",  "oobjects", "cameras", "racearrays",  "world" };
+inline constexpr const char* kGroupNames[kGroupCount] = { "rng",        "race",    "players", "controllers",
+                                                          "objects",    "actors",  "oobjects", "cameras",
+                                                          "racearrays", "world",   "cglobals" };
 
 struct GroupHashes {
     uint64_t g[kGroupCount];

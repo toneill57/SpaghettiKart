@@ -108,11 +108,17 @@ extern s32 D_802874FC;
 
 extern ActorInitParams initBalloon;
 extern ActorInitParams initCone;
-extern ActorInitParams initInitUnk;
+extern ActorInitParams initDummy; // FASE 1.4c: was initInitUnk, a name nothing defines
 extern ActorInitParams initBurst;
 
 extern Gfx* D_802874D4;
 extern s32 D_802874FC;
 extern Mat4 D_80287500;
+
+// FASE 1.4c: read by the oracle's HashCGlobals (src/port/oracle); the defining file includes this header,
+// so the compiler checks each declaration against its definition.
+extern s16 D_802874B0[17]; // podium_ceremony_actors.c:68
+extern u16 sRandomSeed16; // podium_ceremony_actors.c:45
+extern u32 D_80287540; // podium_ceremony_actors.c
 
 #endif

@@ -25,7 +25,7 @@
 s32 sGfxSeekPosition;
 s32 sPackedSeekPosition;
 
-static u8 sMemoryPool[0x10000000] ALIGNED4096;
+static u8 sMemoryPool[MEMORY_POOL_SIZE] ALIGNED4096;
 uintptr_t sPoolEnd = (uintptr_t) (sMemoryPool + sizeof(sMemoryPool));
 
 uintptr_t sPoolFreeSpace;

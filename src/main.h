@@ -115,7 +115,7 @@ extern struct SPTask* sCurrentDisplaySPTask;
 extern struct SPTask* sNextAudioSPTask;
 extern struct SPTask* sNextDisplaySPTask;
 
-extern struct Controller gControllers[];
+extern struct Controller gControllers[8]; // FASE 1.4c: NUM_PLAYERS, not visible here
 extern struct Controller* gControllerOne;
 extern struct Controller* gControllerTwo;
 extern struct Controller* gControllerThree;
@@ -151,12 +151,12 @@ extern OSIoMesg gDmaIoMesg;
 extern OSMesgQueue gSIEventMesgQueue;
 extern OSMesg gSIEventMesgBuf[3];
 
-extern OSContStatus gControllerStatuses[];
+extern OSContStatus gControllerStatuses[4]; // FASE 1.4c: bounded for the oracle
 
-extern OSContPad gControllerPads[];
+extern OSContPad gControllerPads[4]; // FASE 1.4c: bounded for the oracle
 extern u8 gControllerBits;
 
-extern CollisionGrid gCollisionGrid[];
+extern CollisionGrid gCollisionGrid[1024]; // FASE 1.4c: bounded for the oracle
 extern u16 gNumActors;
 extern u16 gMatrixObjectCount;
 extern s32 gTickLogic;
@@ -221,7 +221,7 @@ extern s32 gGlobalTimer;
 extern u16 sRenderedFramebuffer;
 extern u16 sRenderingFramebuffer;
 extern s32 D_800DC568;
-extern s32 D_800DC56C[];
+extern s32 D_800DC56C[8];
 extern s16 sNumVBlanks;
 extern f32 gVBlankTimer;
 extern f32 gCourseTimer;

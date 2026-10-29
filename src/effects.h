@@ -123,12 +123,12 @@ void func_800CA984(u8);
 void func_800CAFC0(u8);
 void func_800CB064(u8);
 
-extern s32 D_8018D900[];
-extern s16 D_8018D920[];
+extern s32 D_8018D900[8];
+extern s16 D_8018D920[8];
 extern s32 gPlayerStarEffectStartTime[];
-extern s32 gPlayerBooEffectStartTime[];
-extern s32 gPlayerOtherScreensAlpha[];
-extern s32 D_8018D990[];
+extern s32 gPlayerBooEffectStartTime[8];
+extern s32 gPlayerOtherScreensAlpha[8];
+extern s32 D_8018D990[8];
 
 /* This is where I'd put my static data, if I had any */
 

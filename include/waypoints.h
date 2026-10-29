@@ -24,21 +24,21 @@ typedef struct {
  * The arrays in gTrackLeftPaths and gTrackRightPaths track some other X/Y/Z, but the track segment is always 0
  * (so, untracked/unused) Its unclear how these arrays relate to each other
  **/
-extern TrackPathPoint* gTrackPaths[];
-extern TrackPathPoint* gTrackLeftPaths[];
-extern TrackPathPoint* gTrackRightPaths[];
+extern TrackPathPoint* gTrackPaths[4]; // FASE 1.4c: bounded for the oracle
+extern TrackPathPoint* gTrackLeftPaths[4]; // FASE 1.4c: bounded for the oracle
+extern TrackPathPoint* gTrackRightPaths[4]; // FASE 1.4c: bounded for the oracle
 
 /**
  * Don't know what exactly these are, but like gTrackPaths, gTrackLeftPaths, and gTrackRightPaths
  * they track something about the path on a per-path basis
  **/
 // PathPoint types?
-extern s16* gTrackSectionTypes[];
+extern s16* gTrackSectionTypes[4]; // FASE 1.4c: bounded for the oracle
 // Based on analyze_path_angle this may be angles between path point
 // gPathExpectedRotation[i] = atan2(path_point_i, path_point_i+1)?
-extern s16* gPathExpectedRotation[];
+extern s16* gPathExpectedRotation[4]; // FASE 1.4c: bounded for the oracle
 // No idea. Adjacency list?
-extern s16* gTrackConsecutiveCurveCounts[];
+extern s16* gTrackConsecutiveCurveCounts[4]; // FASE 1.4c: bounded for the oracle
 
 /**
  * Certain parts of the path point logic will copy some path/player specific data to a temporary variable.
@@ -68,9 +68,9 @@ extern u16 gNearestPathPointByPlayerId[]; // D_80164438
 // Total path point passed by playerId?
 extern s32 gNumPathPointsTraversed[];
 extern u16 gPathIndexByPlayerId[];  // D_801645B0
-extern u16 gPathCountByPathIndex[]; // D_801645C8
+extern u16 gPathCountByPathIndex[4]; // D_801645C8
 // These values are only used when the camera is in "cinematic" mode
-extern s16 gNearestPathPointByCameraId[]; // D_80164668
+extern s16 gNearestPathPointByCameraId[16]; // D_80164668; NUM_CAMERAS (camera.h), not visible here
 
 /**
  * Stuff that may not be directly related to path, but are only referenced in code_80005FD0.
@@ -78,21 +78,21 @@ extern s16 gNearestPathPointByCameraId[]; // D_80164668
  **/
 
 // Tracks something on a per-player basis, no idea what though
-extern f32 gTrackPositionFactor[];
+extern f32 gTrackPositionFactor[10];
 // Track segment by playerId, although it curiously does NOT track values for human players
 // So, in 2 Player Grand Prix, the first 2 entries are always 0
 extern u16 gPlayersTrackSectionId[];
 // Seems to be a per-path overcount of the path point count
-extern s32 D_80163368[];
+extern s32 D_80163368[4];
 // Seemingly the Z position of the 1st path point in the 0th path?
 extern f32 gPathStartZ;
 // These seem to track whether a player has entered or exited the "unknown" zone in yoshi's valley
 // See yoshi_valley_cpu_path and update_cpu_path_completion
 // Is 1 when a player is in the "unknown" zone in yoshi's valley
-extern s16 cpu_enteringPathIntersection[];
+extern s16 cpu_enteringPathIntersection[12];
 // Is 1 when a player leaves the "unknown" zone in yoshi's valley
-extern s16 cpu_exitingPathIntersection[];
+extern s16 cpu_exitingPathIntersection[12];
 // Tracks whether a given player is in the "unknown" zone of yoshi's valley
-extern s16 bInMultiPathSection[];
+extern s16 bInMultiPathSection[12];
 
 #endif

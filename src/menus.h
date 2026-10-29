@@ -227,8 +227,8 @@ extern f32 gIntroModelPosY;
 extern f32 gIntroModelPosZ;
 extern s32 gMenuFadeType;
 
-extern s8 gCharacterGridSelections[];
-extern bool gCharacterGridIsSelected[];
+extern s8 gCharacterGridSelections[4];
+extern bool gCharacterGridIsSelected[4];
 extern s8 gSubMenuSelection;
 extern s8 gMainMenuSelection;
 extern s8 gPlayerSelectMenuSelection;
@@ -256,13 +256,13 @@ extern s8 unref_D_8018EE0C;
 
 extern s32 gMenuSelection; // D_800E86A0
 extern s32 gFadeModeSelection;
-extern s8 gCharacterSelections[];
+extern s8 gCharacterSelections[4];
 
-extern s8 gGameModeMenuColumn[];
+extern s8 gGameModeMenuColumn[NUM_ROWS_GAME_MODE_MENU];
 extern s8 gGameModeSubMenuColumn[NUM_COLUMN_GAME_MODE_SUB_MENU][NUM_ROWS_GAME_MODE_SUB_MENU];
 extern s8 gNextDemoId;
 extern s8 gControllerPakSelectedTableRow;
-extern s8 gControllerPakVisibleTableRows[];
+extern s8 gControllerPakVisibleTableRows[12];
 extern s8 gControllerPakScrollDirection;
 extern s8 unref_D_800E86D4[];
 extern u32 sVIGammaOffDitherOn;
