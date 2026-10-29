@@ -1,4 +1,5 @@
 #include "Snowman.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "engine/World.h"
 
 extern "C" {
@@ -413,4 +414,19 @@ void OSnowman::func_8008379C(s32 objectIndex) {
     }
     object_calculate_new_pos_offset(objectIndex);
     gObjectList[objectIndex].orientation[2] += gObjectList[objectIndex].primAlpha;
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OSnowman::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "Pos", Pos);
+    put(h, "_idx", (uint64_t) _idx);
+    put(h, "_headIndex", _headIndex);
+    put(h, "_bodyIndex", _bodyIndex);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OSnowman::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

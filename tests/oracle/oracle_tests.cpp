@@ -19,6 +19,7 @@
 #include "port/oracle/OracleIdentityHash.h"
 #include "port/oracle/OracleReplay.h"
 #include "port/oracle/OracleArchiveHash.h"
+#include "port/oracle/OracleCoverage.h"
 
 #include <cstddef> // offsetof (--print-offsets)
 
@@ -50,6 +51,9 @@ static void test_replay_cursor();          // 1.5.2
 static void test_apply_pads_keeps_gyro();  // 1.5.2
 static void test_replay_hash_log_path();   // 1.5.4
 static void test_zip_content_hash();       // 1.5 amendment: portArchiveHash = content hash
+static void test_coverage_parser();        // 1.4b.2: the source-text member parser on a fixture (its positive control)
+static void test_subclass_coverage();      // 1.4b.2: 0 unclassified / 0 stale / 0 duplicated (critic)
+static int print_coverage();               // 1.4b.2: --print-coverage, the source-text member list (vs. the clang dump)
 
 int main(int argc, char** argv) {
     // Packed offsets measured by the compiler that writes the files (FASE 1.5 Validation Commands): a byte patch of a
@@ -62,6 +66,9 @@ int main(int argc, char** argv) {
         std::printf("sizeof Pad=%zu\n", sizeof(oracle::Pad));
         std::printf("offsetof Pad.stick_x=%zu\n", offsetof(oracle::Pad, stick_x));
         return 0;
+    }
+    if (argc > 1 && std::strcmp(argv[1], "--print-coverage") == 0) {
+        return print_coverage();
     }
     test_guard_table();
     test_guard_fatal_before_pin();
@@ -82,6 +89,8 @@ int main(int argc, char** argv) {
     test_apply_pads_keeps_gyro();
     test_replay_hash_log_path();
     test_zip_content_hash();
+    test_coverage_parser();
+    test_subclass_coverage();
     std::printf("oracle_tests: %d failure(s)\n", gFailures);
     return gFailures == 0 ? 0 : 1;
 }
@@ -559,15 +568,16 @@ static void test_hasher_scalars() {
               sink.fields[0].bits == 0x80000000ull);
         CHECK(sink.fields.size() == 2 && sink.fields[1].type == "s16" && sink.fields[1].bits == 0xfffeull);
     }
-    // `all` = FNV over the nine group values as LE u64.
+    // `all` = FNV over the group values as LE u64 (ten groups since FASE 1.4b; python3 FNV-1a over struct.pack('<Q'),
+    // which also reproduces the nine-group values this test pinned before: 0x60b3e1fa9c9c0ca4 / 0x3ecb33e15783bec5).
     {
         uint64_t g[oracle::kGroupCount];
         for (int i = 0; i < oracle::kGroupCount; i++) {
             g[i] = (uint64_t) (i + 1);
         }
-        CHECK(oracle::Combine(g) == 0x60b3e1fa9c9c0ca4ull);
+        CHECK(oracle::Combine(g) == 0xcedc94dfee39ee6eull);
         uint64_t z[oracle::kGroupCount] = {};
-        CHECK(oracle::Combine(z) == 0x3ecb33e15783bec5ull);
+        CHECK(oracle::Combine(z) == 0xf14b84b8290b8965ull);
     }
     {
         oracle::GroupHashes a{};
@@ -578,8 +588,9 @@ static void test_hasher_scalars() {
         b.all = 7; // `all` is not a group of its own
         CHECK(oracle::DifferingGroups(a, b) == ((1u << oracle::kRng) | (1u << oracle::kRaceArrays)));
     }
-    CHECK(oracle::kGroupCount == 9);
+    CHECK(oracle::kGroupCount == 10);
     CHECK(std::string(oracle::kGroupNames[0]) == "rng" && std::string(oracle::kGroupNames[8]) == "racearrays");
+    CHECK(std::string(oracle::kGroupNames[9]) == "world" && oracle::kWorld == 9); // FASE 1.4b
 }
 
 namespace {
@@ -664,12 +675,12 @@ const char* kMetaExpected =
     "binaryHash=0x3333333333333333\n"
     "# tickLogic=2 seed=0x1234 fpWord=0x0000020000000000 configHash=0x4444444444444444 modListHash=0x5555555555555555 "
     "gameArchiveHash=0x1111111111111111 portArchiveHash=0x2222222222222222\n"
-    "# groups=rng,race,players,controllers,objects,actors,oobjects,cameras,racearrays,all\n";
+    "# groups=rng,race,players,controllers,objects,actors,oobjects,cameras,racearrays,world,all\n";
 
 const char* kLine7Expected =
     "7 rng=0123456789abcdef race=0123456789abcdf0 players=0123456789abcdf1 controllers=0123456789abcdf2 "
     "objects=0123456789abcdf3 actors=0123456789abcdf4 oobjects=0123456789abcdf5 cameras=0123456789abcdf6 "
-    "racearrays=0123456789abcdf7 all=fedcba9876543210\n";
+    "racearrays=0123456789abcdf7 world=0123456789abcdf8 all=fedcba9876543210\n";
 
 } // namespace
 
@@ -763,6 +774,10 @@ oracle::ModListInput SampleModList() {
 
 static void test_mod_list_hash() {
     const uint64_t base = oracle::HashModList(SampleModList());
+    // FASE 1.4b.5 known answer, computed independently (implement/fase-1-artifacts/1.4b/kat.py: python3 FNV-1a-64 over
+    // the documented layout) — pins the formula itself (tower mutant T07, sort by name only, survived 1.4's property
+    // tests).
+    CHECK(base == 0x137c2a11f7c131f4ull);
     // The registries' iteration order (unordered_map) is NOT identity: any insertion order gives the same value.
     {
         oracle::ModListInput in = SampleModList();
@@ -814,6 +829,9 @@ static void test_config_hash() {
         return oracle::HashConfig(specs, v, 2);
     };
     const uint64_t base = hash(3, 1.5f);
+    // FASE 1.4b.5 known answer, computed independently (1.4b/kat.py) — pins the byte layout (tower mutant T06, the
+    // name's terminator dropped, survived 1.4's property tests).
+    CHECK(base == 0x74d43566c974f4c2ull);
     CHECK(hash(3, 1.5f) == base);
     CHECK(hash(4, 1.5f) != base);
     CHECK(hash(3, 0.0f) != hash(3, -0.0f)); // floats by bit pattern
@@ -1410,4 +1428,912 @@ static void test_zip_content_hash() {
         }
         CHECK(fails(oracle::HashZipContent(WriteFile("zip-name-overrun.o2r", bad).string()), "runs past"));
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// FASE 1.4b — the coverage critic. The member list is re-derived FROM SOURCE TEXT (the class bodies of
+// kCoverageHeaders), as test_cvar_sweep re-runs the CVar sweep; the compiler's record layouts are the second method
+// (1.4b/inventory.py).
+
+namespace {
+
+struct SrcMember {
+    std::string cls;
+    std::string member;
+    std::string where; // file:line
+    bool isStatic;
+};
+
+struct SrcClass {
+    std::string name;
+    std::string where;
+    std::vector<std::string> bases;
+};
+
+// Comments and the CONTENTS of string / char literals become spaces (newlines kept, so line numbers stay true), and so
+// do preprocessor lines. Line comments end at the newline: `//[^\n]*`, never a dot-all `//.*` (that once ate a whole
+// file).
+std::string StripSource(const std::string& s) {
+    std::string o = s;
+    const size_t n = o.size();
+    bool lineStart = true;
+    size_t i = 0;
+    while (i < n) {
+        const char c = o[i];
+        if (c == '/' && i + 1 < n && o[i + 1] == '/') {
+            while (i < n && o[i] != '\n') {
+                o[i++] = ' ';
+            }
+        } else if (c == '/' && i + 1 < n && o[i + 1] == '*') {
+            o[i] = o[i + 1] = ' ';
+            i += 2;
+            while (i < n && !(o[i] == '*' && i + 1 < n && o[i + 1] == '/')) {
+                if (o[i] != '\n') {
+                    o[i] = ' ';
+                }
+                i++;
+            }
+            if (i + 1 < n) {
+                o[i] = o[i + 1] = ' ';
+                i += 2;
+            }
+        } else if (c == '"' || c == '\'') {
+            i++;
+            while (i < n && o[i] != c && o[i] != '\n') {
+                if (o[i] == '\\' && i + 1 < n) {
+                    o[i++] = ' ';
+                }
+                o[i++] = ' ';
+            }
+            i++;
+            lineStart = false;
+            continue;
+        } else if (c == '#' && lineStart) {
+            while (i < n && o[i] != '\n') {
+                if (o[i] == '\\' && i + 1 < n && o[i + 1] == '\n') {
+                    o[i] = ' ';
+                    i += 2;
+                    continue;
+                }
+                o[i++] = ' ';
+            }
+        } else {
+            if (c == '\n') {
+                lineStart = true;
+            } else if (c != ' ' && c != '\t' && c != '\r') {
+                lineStart = false;
+            }
+            i++;
+            continue;
+        }
+    }
+    return o;
+}
+
+std::string Trim(const std::string& s) {
+    const size_t b = s.find_first_not_of(" \t\r\n");
+    if (b == std::string::npos) {
+        return "";
+    }
+    return s.substr(b, s.find_last_not_of(" \t\r\n") - b + 1);
+}
+
+bool IsIdentChar(char c) {
+    return std::isalnum((unsigned char) c) || c == '_';
+}
+
+// Identifier tokens of a declaration (keywords included; `::`-qualified names split).
+std::vector<std::string> Idents(const std::string& s) {
+    std::vector<std::string> out;
+    for (size_t i = 0; i < s.size();) {
+        if (IsIdentChar(s[i]) && !std::isdigit((unsigned char) s[i])) {
+            size_t j = i;
+            while (j < s.size() && IsIdentChar(s[j])) {
+                j++;
+            }
+            out.push_back(s.substr(i, j - i));
+            i = j;
+        } else {
+            i++;
+        }
+    }
+    return out;
+}
+
+bool StartsWithWord(const std::string& s, const char* w) {
+    const size_t n = std::strlen(w);
+    return s.compare(0, n, w) == 0 && (s.size() == n || !IsIdentChar(s[n]));
+}
+
+size_t MatchingClose(const std::string& t, size_t open) { // t[open] is '{', '(' or '['
+    const char o = t[open];
+    const char c = o == '{' ? '}' : o == '(' ? ')' : ']';
+    int depth = 0;
+    for (size_t i = open; i < t.size(); i++) {
+        if (t[i] == o) {
+            depth++;
+        } else if (t[i] == c && --depth == 0) {
+            return i;
+        }
+    }
+    return std::string::npos;
+}
+
+// Top-level split on `sep` outside () [] {} and template <>.
+std::vector<std::string> SplitTop(const std::string& s, char sep) {
+    std::vector<std::string> out;
+    int paren = 0, angle = 0;
+    std::string cur;
+    for (size_t i = 0; i < s.size(); i++) {
+        const char c = s[i];
+        if (c == '(' || c == '[' || c == '{') {
+            paren++;
+        } else if (c == ')' || c == ']' || c == '}') {
+            paren--;
+        } else if (c == '<' && i > 0 && (IsIdentChar(s[i - 1]) || s[i - 1] == ' ') && paren == 0) {
+            angle++;
+        } else if (c == '>' && angle > 0 && paren == 0) {
+            angle--;
+        }
+        if (c == sep && paren == 0 && angle == 0) {
+            out.push_back(cur);
+            cur.clear();
+        } else {
+            cur += c;
+        }
+    }
+    out.push_back(cur);
+    return out;
+}
+
+// Position of the first top-level occurrence of any char in `chars` (outside () [] {} and template <>), or npos.
+size_t FindTop(const std::string& s, const char* chars) {
+    int paren = 0, angle = 0;
+    for (size_t i = 0; i < s.size(); i++) {
+        const char c = s[i];
+        if (paren == 0 && angle == 0 && std::strchr(chars, c) != nullptr) {
+            return i;
+        }
+        if (c == '(' || c == '[' || c == '{') {
+            paren++;
+        } else if (c == ')' || c == ']' || c == '}') {
+            paren--;
+        } else if (c == '<' && i > 0 && IsIdentChar(s[i - 1]) && paren == 0) {
+            angle++;
+        } else if (c == '>' && angle > 0 && paren == 0) {
+            angle--;
+        }
+    }
+    return std::string::npos;
+}
+
+// Leading object-like macros (EXTERN_C_START, ALIGNED8, …): ALL-CAPS words not followed by '(' are dropped.
+std::string DropMacros(std::string h) {
+    for (;;) {
+        h = Trim(h);
+        const std::vector<std::string> w = Idents(h);
+        if (w.empty() || h.find(w[0]) != 0 || w[0].size() < 2 ||
+            std::any_of(w[0].begin(), w[0].end(), [](char ch) { return std::islower((unsigned char) ch); })) {
+            return h;
+        }
+        const std::string rest = Trim(h.substr(w[0].size()));
+        if (!rest.empty() && rest[0] == '(') {
+            return h;
+        }
+        h = rest;
+    }
+}
+
+struct CoverageScan {
+    std::vector<SrcClass> classes;
+    std::vector<SrcMember> members;
+    std::string file;
+    const std::string* text = nullptr;
+
+    std::string Where(size_t pos) const {
+        return file + ":" + std::to_string((long) std::count(text->begin(), text->begin() + (long) pos, '\n') + 1);
+    }
+
+    // One data-member declaration statement (the brace bodies of nested types already cut out).
+    void Declaration(const std::string& cls, std::string stmt, size_t pos) {
+        stmt = DropMacros(stmt);
+        for (const char* skip : { "using", "typedef", "friend", "template", "static_assert", "namespace" }) {
+            if (StartsWithWord(stmt, skip)) {
+                return;
+            }
+        }
+        if (StartsWithWord(stmt, "enum") && stmt.find("{}") != std::string::npos) {
+            return; // an enum definition (`enum MusicSeq Sequence;` without a body IS a member)
+        }
+        for (const std::string& w : Idents(stmt)) {
+            if (w == "operator") {
+                return; // operator==(…): its '=' would otherwise read as an initializer
+            }
+        }
+        if (stmt.empty() || stmt == "{}") {
+            return;
+        }
+        const std::string head = stmt.substr(0, FindTop(stmt, "={"));
+        const std::vector<std::string> words = Idents(head);
+        bool isStatic = false;
+        for (const std::string& w : words) {
+            isStatic = isStatic || w == "static";
+        }
+        if (isStatic) {
+            // static constexpr / static const T: not state. But `static const char* tbl[]` IS mutable — the const binds
+            // the pointee, so it only makes the object const when no '*' follows the last `const`.
+            size_t lastConst = std::string::npos;
+            for (const std::string& w : words) {
+                if (w == "constexpr" || w == "consteval" || w == "constinit") {
+                    return;
+                }
+            }
+            for (size_t k = head.find("const"); k != std::string::npos; k = head.find("const", k + 5)) {
+                if ((k == 0 || !IsIdentChar(head[k - 1])) && (k + 5 >= head.size() || !IsIdentChar(head[k + 5]))) {
+                    lastConst = k;
+                }
+            }
+            if (lastConst != std::string::npos && head.find('*', lastConst) == std::string::npos) {
+                return;
+            }
+        }
+        // A function declaration: a top-level '(' before any initializer ('=' or '{').
+        const size_t paren = FindTop(stmt, "(");
+        const size_t init = FindTop(stmt, "={");
+        if (paren != std::string::npos && (init == std::string::npos || paren < init)) {
+            return;
+        }
+        // A forward declaration (`class Foo;`, `struct Bar;`).
+        if ((StartsWithWord(stmt, "class") || StartsWithWord(stmt, "struct")) && words.size() == 2) {
+            return;
+        }
+        const std::vector<std::string> decls = SplitTop(init == std::string::npos ? stmt : stmt.substr(0, init), ',');
+        for (std::string d : decls) {
+            d = d.substr(0, FindTop(d, "={"));
+            const size_t bracket = FindTop(d, "[");
+            if (bracket != std::string::npos) {
+                d = d.substr(0, bracket);
+            }
+            const size_t colon = d.rfind(':');
+            const bool bitField = colon != std::string::npos && colon > 0 && d[colon - 1] != ':' &&
+                                  (colon + 1 >= d.size() || d[colon + 1] != ':');
+            if (bitField) {
+                d = d.substr(0, colon); // bit-field width
+            }
+            const std::vector<std::string> ids = Idents(d);
+            if (ids.empty()) {
+                continue;
+            }
+            members.push_back(SrcMember{ cls, ids.back(), Where(pos), isStatic });
+        }
+    }
+
+    // Scans [b, e) of the stripped text. `cls` is the enclosing class ("" at namespace / file scope).
+    void Scope(size_t b, size_t e, const std::string& cls) {
+        const std::string& t = *text;
+        std::string stmt;
+        size_t stmtPos = b;
+        bool stmtIsType = false; // the statement defined a type: what follows its body are declarators
+        bool stmtIsTypedef = false; // …or, after a typedef, the type's name (no member)
+        std::string typeName;
+        for (size_t i = b; i < e; i++) {
+            const char c = t[i];
+            if (stmt.empty() && std::isspace((unsigned char) c)) {
+                stmtPos = i + 1;
+                continue;
+            }
+            if (c == '{') {
+                const size_t close = MatchingClose(t, i);
+                if (close == std::string::npos || close > e) {
+                    return;
+                }
+                const std::string head = DropMacros(stmt);
+                if (StartsWithWord(head, "namespace") || StartsWithWord(head, "extern")) {
+                    Scope(i + 1, close, cls);
+                    stmt.clear();
+                    i = close;
+                    continue;
+                }
+                std::string h = head;
+                if (StartsWithWord(h, "template")) {
+                    const size_t gt = h.find('>');
+                    h = gt == std::string::npos ? h : Trim(h.substr(gt + 1));
+                }
+                const bool isTypedef = StartsWithWord(h, "typedef");
+                if (isTypedef) {
+                    h = Trim(h.substr(7));
+                }
+                if (StartsWithWord(h, "class") || StartsWithWord(h, "struct") || StartsWithWord(h, "union")) {
+                    // class|struct|union [alignas(..)] [Name] [final] [: bases]
+                    const size_t colon = [&] {
+                        for (size_t k = 0; k + 1 < h.size(); k++) {
+                            if (h[k] == ':' && h[k + 1] != ':' && (k == 0 || h[k - 1] != ':')) {
+                                return k;
+                            }
+                        }
+                        return std::string::npos;
+                    }();
+                    std::vector<std::string> ids = Idents(colon == std::string::npos ? h : h.substr(0, colon));
+                    ids.erase(std::remove_if(ids.begin(), ids.end(),
+                                             [](const std::string& w) {
+                                                 return w == "class" || w == "struct" || w == "union" || w == "final" ||
+                                                        w == "alignas";
+                                             }),
+                              ids.end());
+                    std::string name = ids.empty() ? "" : ids.back();
+                    if (name.empty() && isTypedef) {
+                        const size_t semi = t.find(';', close);
+                        const std::vector<std::string> after = Idents(t.substr(close + 1, semi - close - 1));
+                        name = after.empty() ? "" : after.front();
+                    }
+                    std::vector<std::string> bases;
+                    if (colon != std::string::npos) {
+                        for (const std::string& part : SplitTop(h.substr(colon + 1), ',')) {
+                            std::string p = part.substr(0, part.find('<'));
+                            const std::vector<std::string> pid = Idents(p);
+                            if (!pid.empty()) {
+                                bases.push_back(pid.back());
+                            }
+                        }
+                    }
+                    if (name.empty()) {
+                        Scope(i + 1, close, cls); // anonymous struct/union: its members belong to the enclosing class
+                        typeName.clear();
+                    } else {
+                        const std::string q = cls.empty() ? name : cls + "::" + name;
+                        classes.push_back(SrcClass{ q, Where(i), bases });
+                        Scope(i + 1, close, q);
+                        typeName = q;
+                    }
+                    stmtIsType = !isTypedef;
+                    stmtIsTypedef = isTypedef;
+                    // What follows the body, up to ';', are declarators of the enclosing class (or the typedef name).
+                    stmt = "{}";
+                    i = close;
+                    continue;
+                }
+                if (StartsWithWord(h, "enum")) {
+                    stmt += "{}";
+                    i = close;
+                    continue;
+                }
+                // A function / constructor body (its head has a top-level '('): the statement ends at '}'.
+                const size_t p = FindTop(head, "(");
+                const size_t eq = FindTop(head, "=");
+                if (p != std::string::npos && (eq == std::string::npos || p < eq)) {
+                    stmt.clear();
+                    stmtIsType = false;
+                    i = close;
+                    if (i + 1 < e && t[i + 1] == ';') {
+                        i++;
+                    }
+                    continue;
+                }
+                stmt += "{}"; // a brace initializer of a data member
+                i = close;
+                continue;
+            }
+            if (c == ';') {
+                if (!cls.empty() && !stmtIsTypedef) {
+                    std::string s = Trim(stmt);
+                    if (stmtIsType || s.rfind("{}", 0) == 0) {
+                        s = Trim(s.substr(s.rfind("{}", 0) == 0 ? 2 : 0));
+                        if (!s.empty() && !typeName.empty()) {
+                            Declaration(cls, typeName + " " + s, stmtPos);
+                        } else if (!s.empty()) {
+                            Declaration(cls, "anon " + s, stmtPos);
+                        }
+                    } else {
+                        Declaration(cls, s, stmtPos);
+                    }
+                }
+                stmt.clear();
+                stmtIsType = false;
+                stmtIsTypedef = false;
+                typeName.clear();
+                continue;
+            }
+            if (c == ':' && !cls.empty()) {
+                const std::string s = Trim(stmt);
+                if ((s == "public" || s == "private" || s == "protected") && (i + 1 >= e || t[i + 1] != ':')) {
+                    stmt.clear();
+                    continue;
+                }
+            }
+            if (c == '(') { // skip a parenthesised group whole: it can hold ';' (for), '{' (lambdas) and ':'
+                const size_t close = MatchingClose(t, i);
+                if (close == std::string::npos || close > e) {
+                    return;
+                }
+                stmt += t.substr(i, close - i + 1);
+                i = close;
+                continue;
+            }
+            stmt += c;
+        }
+    }
+};
+
+// Every `static` variable outside a class body in a .cpp: file-scope and function-local (FASE 1.4b.1 b, the wider
+// equivalent of `rg '\bstatic\b(?![^;{]*\bconst\b)[^;{(]*;'`: multi-line declarations and brace initializers included).
+std::vector<SrcMember> ScanCppStatics(const std::string& raw, const std::string& file) {
+    std::vector<SrcMember> out;
+    const std::string t = StripSource(raw);
+    CoverageScan probe;
+    probe.file = file;
+    probe.text = &t;
+    for (size_t p = t.find("static"); p != std::string::npos; p = t.find("static", p + 6)) {
+        if ((p > 0 && IsIdentChar(t[p - 1])) || (p + 6 < t.size() && IsIdentChar(t[p + 6]))) {
+            continue; // static_cast, static_assert, …
+        }
+        if (p >= 2 && t[p - 1] == ':' && t[p - 2] == ':') {
+            continue;
+        }
+        // The statement: up to the first top-level ';' — a '{' after '=' is an initializer; a '{' after a top-level '('
+        // is a function body (a static function: not a variable).
+        std::string stmt;
+        size_t i = p;
+        bool function = false;
+        for (; i < t.size() && t[i] != ';'; i++) {
+            if (t[i] == '(' || t[i] == '[') {
+                const size_t close = MatchingClose(t, i);
+                if (close == std::string::npos) {
+                    break;
+                }
+                stmt += t.substr(i, close - i + 1);
+                i = close;
+                continue;
+            }
+            if (t[i] == '{') {
+                const size_t paren = FindTop(stmt, "(");
+                const size_t eq = FindTop(stmt, "=");
+                if (paren != std::string::npos && (eq == std::string::npos || paren < eq)) {
+                    function = true;
+                    break;
+                }
+                const size_t close = MatchingClose(t, i);
+                if (close == std::string::npos) {
+                    break;
+                }
+                stmt += "{}";
+                i = close;
+                continue;
+            }
+            stmt += t[i];
+        }
+        if (function) {
+            continue;
+        }
+        const size_t before = probe.members.size();
+        probe.Declaration("<file>", stmt, p);
+        for (size_t k = before; k < probe.members.size(); k++) {
+            out.push_back(SrcMember{ file, probe.members[k].member, probe.members[k].where, true });
+        }
+    }
+    probe.text = nullptr;
+    return out;
+}
+
+// The body of a function DEFINITION named `site` ("OTrophy::HashState", "HashActors") in a stripped text, or npos.
+std::pair<size_t, size_t> FindDefinition(const std::string& t, const std::string& site) {
+    for (size_t p = t.find(site); p != std::string::npos; p = t.find(site, p + 1)) {
+        if ((p > 0 && (IsIdentChar(t[p - 1]) || t[p - 1] == ':')) || !(p + site.size() < t.size())) {
+            continue;
+        }
+        size_t q = p + site.size();
+        while (q < t.size() && std::isspace((unsigned char) t[q])) {
+            q++;
+        }
+        if (q >= t.size() || t[q] != '(') {
+            continue;
+        }
+        q = MatchingClose(t, q);
+        if (q == std::string::npos) {
+            continue;
+        }
+        q++;
+        while (q < t.size() && (std::isspace((unsigned char) t[q]) || IsIdentChar(t[q]))) {
+            q++; // const, override
+        }
+        if (q < t.size() && t[q] == '{') {
+            const size_t close = MatchingClose(t, q);
+            if (close != std::string::npos) {
+                return { q, close };
+            }
+        }
+    }
+    return { std::string::npos, std::string::npos };
+}
+
+CoverageScan ScanCoverageText(const std::string& raw, const std::string& file) {
+    CoverageScan s;
+    const std::string stripped = StripSource(raw);
+    s.file = file;
+    s.text = &stripped;
+    s.Scope(0, stripped.size(), "");
+    s.text = nullptr;
+    return s;
+}
+
+const char* kParserFixture = R"FIX(
+#include "x.h"
+#define M(a) struct NotAClass { int x; };
+// class Commented { int no; };
+/* struct Blocked { int no; }; */
+class ABase : public AActor {
+  public:
+    s16 a, b;                       // two declarators
+    Vtx myVtx[12] = { { 1, 2 }, { 3, 4 } };
+    FVector Pos{0.0f, 0.0f, 0.0f};
+    static size_t _count;
+    static constexpr int kLimit = 3;
+    static const char* kName;
+    const char* Name = "a;b{c}";
+    std::map<uint32_t, std::vector<uint32_t>> Counts;
+    std::function<void(int, float)> cb;
+    u32 flags : 3;
+    enum class Mode { A, B };
+    Mode mode = Mode::A;
+    struct Entry {
+        OMole* Mole;
+        bool Active;
+    };
+    std::vector<Entry> _entries;
+    union {
+        uint64_t crc;
+        void* model;
+    };
+    ABase(const SpawnParams& p) : a(1), b(2) { for (int i = 0; i < 3; i++) { } }
+    virtual void Tick() override;
+    void Draw() const { if (a) { return; } };
+    bool operator==(const ABase& o) const;
+    ~ABase() = default;
+  private:
+    Player* _player = nullptr;
+    enum MusicSeq Sequence;
+};
+EXTERN_C_START
+EXTERN_C_END
+namespace fwd { class Hasher; }
+class Macroed {
+    int m;
+};
+typedef struct {
+    s16 isActive;
+    Vec3f position;
+} CarStuff;
+namespace N { struct Inner : public OObject { int z; }; }
+)FIX";
+
+} // namespace
+
+// The parser's own positive control: every construct the engine headers use, on a fixture, member by member.
+static void test_coverage_parser() {
+    const CoverageScan s = ScanCoverageText(kParserFixture, "fixture.h");
+    std::vector<std::string> got;
+    for (const SrcMember& m : s.members) {
+        got.push_back(m.cls + "::" + m.member + (m.isStatic ? "(static)" : ""));
+    }
+    const std::vector<std::string> want = {
+        "ABase::a",           "ABase::b",           "ABase::myVtx",         "ABase::Pos",
+        "ABase::_count(static)", "ABase::kName(static)", "ABase::Name",     "ABase::Counts",
+        "ABase::cb",          "ABase::flags",       "ABase::mode",          "ABase::Entry::Mole",
+        "ABase::Entry::Active", "ABase::_entries",  "ABase::crc",           "ABase::model",
+        "ABase::_player",     "ABase::Sequence",    "Macroed::m",           "CarStuff::isActive",
+        "CarStuff::position", "Inner::z" };
+    if (got != want) {
+        std::fprintf(stderr, "  parser fixture members:");
+        for (const std::string& g : got) {
+            std::fprintf(stderr, " %s", g.c_str());
+        }
+        std::fprintf(stderr, "\n");
+    }
+    CHECK(got == want);
+    std::vector<std::string> classes;
+    for (const SrcClass& c : s.classes) {
+        classes.push_back(c.name + (c.bases.empty() ? "" : ":" + c.bases[0]));
+    }
+    const std::vector<std::string> wantClasses = { "ABase:AActor", "ABase::Entry", "Macroed", "CarStuff",
+                                                   "Inner:OObject" };
+    CHECK(classes == wantClasses);
+    CHECK(s.members.size() == want.size() && s.members[0].where == "fixture.h:8");
+
+    // The .cpp statics sweep on its own fixture: file-scope, multi-line, brace-initialized and function-local statics
+    // are found; static functions, const / constexpr statics, static_cast / static_assert and comments are not.
+    const char* cpp = R"FIX(
+static float sAngle = 0.0f;
+static Vtx sVtx[2] = {
+    { 1, 2 }, { 3, 4 },
+};
+static std::map<int,
+                int> sMulti;
+static const int kConst = 1;
+static constexpr float kPi = 3.14f;
+static const char* sTable[] = { "a", "b" };
+static char* const kFixedPtr = nullptr;
+static void Helper(int a) {
+    static int sLocal = 3;
+    int x = static_cast<int>(a);
+}
+static_assert(sizeof(int) == 4, "int");
+// static int sCommented;
+int NotStatic = 0;
+)FIX";
+    std::vector<std::string> statics;
+    for (const SrcMember& m : ScanCppStatics(cpp, "fixture.cpp")) {
+        statics.push_back(m.member + "@" + m.where);
+    }
+    const std::vector<std::string> wantStatics = { "sAngle@fixture.cpp:2", "sVtx@fixture.cpp:3", "sMulti@fixture.cpp:6",
+                                                   "sTable@fixture.cpp:10", "sLocal@fixture.cpp:13" };
+    if (statics != wantStatics) {
+        std::fprintf(stderr, "  cpp statics fixture:");
+        for (const std::string& x : statics) {
+            std::fprintf(stderr, " %s", x.c_str());
+        }
+        std::fprintf(stderr, "\n");
+    }
+    CHECK(statics == wantStatics);
+}
+
+namespace {
+
+struct CoverageSource {
+    std::vector<SrcClass> classes;            // defined in kCoverageHeaders
+    std::vector<SrcMember> members;           // of those classes
+    std::vector<SrcClass> engineClasses;      // every class defined in any src/engine header (for root discovery)
+    std::vector<SrcMember> otherStatics;      // class statics of classes NOT in kCoverageHeaders (engine, port/oracle)
+    std::vector<SrcMember> cppStatics;        // file-scope / function-local statics of src/engine + port/oracle .cpp
+    std::vector<std::pair<std::string, std::string>> code; // (raw, stripped) of each .cpp there: where hashing lives
+    size_t files = 0;
+};
+
+CoverageSource ScanCoverageSource() {
+    CoverageSource out;
+    const std::filesystem::path root = std::filesystem::path(ORACLE_SOURCE_DIR) / "..";
+    std::set<std::string> listed;
+    for (const char* h : oracle::kCoverageHeaders) {
+        listed.insert(h);
+        const CoverageScan s = ScanCoverageText(ReadFile(root / h), h);
+        out.files++;
+        out.classes.insert(out.classes.end(), s.classes.begin(), s.classes.end());
+        out.members.insert(out.members.end(), s.members.begin(), s.members.end());
+    }
+    for (const char* dir : { "src/engine", "src/port/oracle" }) {
+        std::error_code ec;
+        for (auto it = std::filesystem::recursive_directory_iterator(root / dir, ec);
+             !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
+            const std::string ext = it->path().extension().string();
+            if (!it->is_regular_file() || (ext != ".h" && ext != ".cpp")) {
+                continue;
+            }
+            const std::string rel = std::filesystem::relative(it->path(), root).generic_string();
+            const std::string raw = ReadFile(it->path());
+            if (ext == ".h") {
+                const CoverageScan s = ScanCoverageText(raw, rel);
+                out.engineClasses.insert(out.engineClasses.end(), s.classes.begin(), s.classes.end());
+                if (listed.count(rel) == 0) {
+                    for (const SrcMember& m : s.members) {
+                        if (m.isStatic) { // keyed like a .cpp static: (file, "Class::name")
+                            out.otherStatics.push_back(SrcMember{ rel, m.cls + "::" + m.member, m.where, true });
+                        }
+                    }
+                }
+            } else {
+                const std::vector<SrcMember> st = ScanCppStatics(raw, rel);
+                out.cppStatics.insert(out.cppStatics.end(), st.begin(), st.end());
+                out.code.emplace_back(raw, StripSource(raw));
+            }
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+// "0 unclassified" as a test: a member added later fails here until it is hashed or excluded with a reason.
+static void test_subclass_coverage() {
+    const CoverageSource src = ScanCoverageSource();
+    std::set<std::string> outOfScope;
+    for (const oracle::OutOfScopeClass& o : oracle::kOutOfScopeClasses) {
+        outOfScope.insert(o.cls);
+        CHECK(o.reason != nullptr && std::strlen(o.reason) > 0);
+    }
+    // Every class deriving (transitively) from a root is defined in a covered header — a new actor in a new file fails.
+    std::set<std::string> inScopeNames;
+    for (const SrcClass& c : src.classes) {
+        if (outOfScope.count(c.name) == 0) {
+            inScopeNames.insert(c.name);
+        }
+    }
+    std::set<std::string> derived(std::begin(oracle::kCoverageRoots), std::end(oracle::kCoverageRoots));
+    for (bool grew = true; grew;) {
+        grew = false;
+        for (const SrcClass& c : src.engineClasses) {
+            if (derived.count(c.name) == 0 && !c.bases.empty() && derived.count(c.bases[0]) != 0) {
+                derived.insert(c.name);
+                grew = true;
+            }
+        }
+    }
+    size_t subclasses = 0;
+    for (const std::string& d : derived) {
+        const auto* rootsEnd = std::end(oracle::kCoverageRoots);
+        if (std::find(std::begin(oracle::kCoverageRoots), rootsEnd, d) != rootsEnd) {
+            continue;
+        }
+        subclasses++;
+        if (inScopeNames.count(d) == 0) {
+            std::fprintf(stderr, "  subclass %s is not defined in a kCoverageHeaders file\n", d.c_str());
+        }
+        CHECK(inScopeNames.count(d) == 1);
+    }
+    // The classification: each member in exactly one table, each row naming a member that exists.
+    std::set<std::pair<std::string, std::string>> members;
+    size_t unclassified = 0;
+    for (const SrcMember& m : src.members) {
+        if (outOfScope.count(m.cls) != 0) {
+            continue;
+        }
+        members.insert({ m.cls, m.member });
+        int hashed = 0, excluded = 0;
+        for (const oracle::CoverageRow& r : oracle::kHashed) {
+            hashed += m.cls == r.cls && m.member == r.member;
+        }
+        for (const oracle::CoverageRow& r : oracle::kExcluded) {
+            excluded += m.cls == r.cls && m.member == r.member;
+        }
+        if (hashed + excluded == 0 && ++unclassified <= 10) {
+            std::fprintf(stderr, "  unclassified %s::%s%s (%s)\n", m.cls.c_str(), m.member.c_str(),
+                         m.isStatic ? " [static]" : "", m.where.c_str());
+        }
+        if (hashed + excluded > 1) {
+            std::fprintf(stderr, "  duplicated %s::%s (%d hashed, %d excluded)\n", m.cls.c_str(), m.member.c_str(),
+                         hashed, excluded);
+        }
+        CHECK(hashed + excluded == 1);
+    }
+    if (unclassified > 10) {
+        std::fprintf(stderr, "  … %zu unclassified in all\n", unclassified);
+    }
+    auto checkRows = [&](const oracle::CoverageRow* rows, size_t n) {
+        for (size_t i = 0; i < n; i++) {
+            const bool exists = members.count({ rows[i].cls, rows[i].member }) == 1;
+            if (!exists) {
+                std::fprintf(stderr, "  stale row %s::%s (no such member)\n", rows[i].cls, rows[i].member);
+            }
+            CHECK(exists);
+            CHECK(rows[i].rule != nullptr && std::strlen(rows[i].rule) > 0);
+        }
+    };
+    checkRows(oracle::kHashed, std::size(oracle::kHashed));
+    for (const oracle::CoverageRow& r : oracle::kHashed) { // every rule is a documented one
+        bool known = std::strncmp(r.rule, "group:", 6) == 0;
+        for (const char* k : oracle::kRules) {
+            known = known || std::strcmp(r.rule, k) == 0;
+        }
+        if (!known) {
+            std::fprintf(stderr, "  %s::%s: rule \"%s\" is not in kRules\n", r.cls, r.member, r.rule);
+        }
+        CHECK(known);
+    }
+    checkRows(oracle::kExcluded, std::size(oracle::kExcluded));
+    for (const std::string& c : outOfScope) {
+        bool defined = false;
+        for (const SrcClass& k : src.classes) {
+            defined = defined || k.name == c;
+        }
+        if (!defined) {
+            std::fprintf(stderr, "  stale out-of-scope class %s\n", c.c_str());
+        }
+        CHECK(defined);
+    }
+    // The code hashes what the table says: every kHashed row's name appears as a literal in its class's hash function
+    // (a put() dropped from an override fails here, not only in a run). Rows hashed by another group's walk are
+    // skipped.
+    auto site = [](const std::string& cls, const char* rule) -> std::string {
+        for (const oracle::HashSite& s : oracle::kHashSites) {
+            if (cls == s.cls) {
+                return s.site;
+            }
+        }
+        return cls + (std::strcmp(rule, "statics") == 0 ? "::HashStatics" : "::HashState");
+    };
+    size_t sitesChecked = 0;
+    for (const oracle::CoverageRow& r : oracle::kHashed) {
+        if (std::strncmp(r.rule, "group:", 6) == 0) {
+            continue;
+        }
+        const std::string fn = site(r.cls, r.rule);
+        bool defined = false, named = false;
+        for (const auto& [raw, stripped] : src.code) {
+            const auto [b, e] = FindDefinition(stripped, fn);
+            if (b == std::string::npos) {
+                continue;
+            }
+            defined = true;
+            named = named || raw.substr(b, e - b).find("\"" + std::string(r.member) + "\"") != std::string::npos;
+        }
+        if (!defined || !named) {
+            std::fprintf(stderr, "  %s::%s: %s\n", r.cls, r.member,
+                         !defined ? ("no definition of " + fn).c_str() : ("not put() by " + fn).c_str());
+        }
+        CHECK(defined && named);
+        sitesChecked++;
+    }
+    CHECK(sitesChecked > 400);
+
+    // Statics outside the class tables (FASE 1.4b.1 b): .cpp file-scope / function-local statics, and the class statics
+    // of classes outside kCoverageHeaders. Each is hashed (named in its site's body) or excluded with a reason.
+    std::vector<SrcMember> statics = src.cppStatics;
+    statics.insert(statics.end(), src.otherStatics.begin(), src.otherStatics.end());
+    std::set<std::pair<std::string, std::string>> staticKeys;
+    for (const SrcMember& m : statics) {
+        staticKeys.insert({ m.cls, m.member });
+        int found = 0;
+        for (const oracle::StaticRow& r : oracle::kStaticsHashed) {
+            found += m.cls == r.file && m.member == r.name;
+        }
+        for (const oracle::StaticRow& r : oracle::kStaticsExcluded) {
+            found += m.cls == r.file && m.member == r.name;
+        }
+        if (found != 1) {
+            std::fprintf(stderr, "  static %s %s (%s): %s\n", m.cls.c_str(), m.member.c_str(), m.where.c_str(),
+                         found == 0 ? "unclassified" : "in more than one row");
+        }
+        CHECK(found == 1);
+    }
+    for (const oracle::StaticRow& r : oracle::kStaticsHashed) {
+        CHECK(staticKeys.count({ r.file, r.name }) == 1);
+        bool named = false;
+        for (const auto& [raw, stripped] : src.code) {
+            const auto [b, e] = FindDefinition(stripped, r.rule);
+            named = named || (b != std::string::npos && stripped.substr(b, e - b).find(r.name) != std::string::npos);
+        }
+        if (!named) {
+            std::fprintf(stderr, "  static %s %s: not hashed by %s\n", r.file, r.name, r.rule);
+        }
+        CHECK(named);
+    }
+    for (const oracle::StaticRow& r : oracle::kStaticsExcluded) {
+        if (staticKeys.count({ r.file, r.name }) != 1) {
+            std::fprintf(stderr, "  stale static row %s %s\n", r.file, r.name);
+        }
+        CHECK(staticKeys.count({ r.file, r.name }) == 1);
+        CHECK(std::strlen(r.rule) > 0);
+    }
+    // Positive control of the static sweep: the two hoisted angles, Thwomp's hoisted temp_s7 and a brace-initialized
+    // one.
+    CHECK(staticKeys.count({ "src/engine/actors/SpaghettiShip.cpp", "sSpaghettiShipAngle" }) == 1);
+    CHECK(staticKeys.count({ "src/engine/actors/Starship.cpp", "sStarshipAngle" }) == 1);
+    CHECK(staticKeys.count({ "src/engine/objects/Thwomp.cpp", "sThwompTempS7" }) == 1);
+    CHECK(statics.size() > 10);
+
+    // Positive control: the scan can see (measured at 1.4b: the clang record layouts list 38 AActor/OObject
+    // subclasses).
+    CHECK(src.files >= 60);
+    CHECK(members.size() > 300);
+    CHECK(subclasses >= 38);
+    CHECK(members.count({ "ATrain", "Locomotive" }) == 1);
+    CHECK(members.count({ "OBombKart", "_target" }) == 1);
+    CHECK(members.count({ "PlayerBombKart", "surfaceHeight" }) == 1);
+}
+
+static int print_coverage() {
+    const CoverageSource src = ScanCoverageSource();
+    for (const SrcMember& m : src.members) {
+        std::printf("%s · %s%s · %s\n", m.cls.c_str(), m.member.c_str(), m.isStatic ? " [static]" : "",
+                    m.where.c_str());
+    }
+    for (const SrcClass& c : src.engineClasses) {
+        std::printf("#class %s : %s · %s\n", c.name.c_str(), c.bases.empty() ? "" : c.bases[0].c_str(),
+                    c.where.c_str());
+    }
+    for (const SrcMember& m : src.cppStatics) {
+        std::printf("#static %s · %s · %s\n", m.cls.c_str(), m.member.c_str(), m.where.c_str());
+    }
+    for (const SrcMember& m : src.otherStatics) {
+        std::printf("#static %s · %s · %s\n", m.cls.c_str(), m.member.c_str(), m.where.c_str());
+    }
+    std::printf("#files %zu members %zu\n", src.files, src.members.size());
+    return 0;
 }

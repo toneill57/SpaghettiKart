@@ -1,4 +1,5 @@
 #include "Flagpole.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "engine/World.h"
 #include "port/interpolation/FrameInterpolation.h"
 
@@ -99,4 +100,16 @@ void OFlagpole::func_80083018(s32 objectIndex) {
 
 void OFlagpole::func_80083060(s32 objectIndex) {
     object_calculate_new_pos_offset(objectIndex);
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OFlagpole::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_idx", (uint64_t) _idx);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OFlagpole::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

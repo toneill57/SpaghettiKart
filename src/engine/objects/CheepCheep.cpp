@@ -1,4 +1,5 @@
 #include "CheepCheep.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "port/Game.h"
 #include "port/interpolation/FrameInterpolation.h"
 
@@ -285,4 +286,12 @@ void OCheepCheep::DrawEditorProperties() {
     if (ImGui::Button(ICON_FA_UNDO "##ResetPathSpan")) {
         ActivationPoints = IPathSpan(0.0f, 0.0f);
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OCheepCheep::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "ActivationPoints", ActivationPoints);
+    put(h, "_idx", _idx);
+    put(h, "_behaviour", _behaviour);
 }

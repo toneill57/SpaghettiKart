@@ -1,4 +1,5 @@
 #include "TrackBrowser.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "port/Engine.h"
 #include "engine/editor/SceneManager.h"
 #include "engine/tracks/CustomTrack.h"
@@ -137,4 +138,13 @@ extern "C" const char* TrackBrowser_GetTrackLengthByIdx(size_t trackIndex) {
 
 extern "C" const char* TrackBrowser_GetMinimapTextureByIdx(size_t trackIndex) {
     return TrackBrowser::Instance->GetMinimapTextureByIdx(trackIndex);
+}
+
+// MK64 Online FASE 1.4b: the oracle hashes the browser's menu state. mTracks is the registry's track list sorted by id
+// (identity: modListHash); sCurrentlySelectedTrack gates TrackBrowser_SetTrackFromCup, and SetTrack re-invokes the
+// track registry — not idempotent, so the cache is state.
+void TrackBrowser::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "mTrackIndex", (uint64_t) mTrackIndex);
+    put(h, "sCurrentlySelectedTrack", sCurrentlySelectedTrack);
 }

@@ -14,6 +14,10 @@ EXTERN_C_START
 #include "code_800029B0.h"
 EXTERN_C_END
 
+namespace oracle { // MK64 Online FASE 1.4b
+class Hasher;
+}
+
 class Sky {
 public:
     static Sky* Instance;
@@ -32,6 +36,9 @@ private:
     static Vtx mSkyboxScreenFour[8];
 
     std::vector<std::unique_ptr<SkyActor>> mSkyActors;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const;
 };
 #endif // __cplusplus
 

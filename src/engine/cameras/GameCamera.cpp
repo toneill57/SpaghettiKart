@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include "GameCamera.h"
 #include "port/interpolation/FrameInterpolation.h"
@@ -101,4 +102,18 @@ void GameCamera::SetViewProjection() {
               G_MTX_NOPUSH | G_MTX_MUL | G_MTX_PROJECTION);
 
     FrameInterpolation_RecordCloseChild();
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void GameCamera::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "ProjMode", ProjMode);
+    put(h, "bActive", bActive);
+    oracle::PutCameraPtr(h, "_camera", _camera, "GameCamera::_camera");
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void GameCamera::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

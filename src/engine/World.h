@@ -27,6 +27,10 @@ extern "C" {
 #include "objects.h"
 };
 
+namespace oracle { // MK64 Online FASE 1.4b
+class Hasher;
+}
+
 class Cup; // <-- Forward declaration
 class OObject;
 class GameCamera;
@@ -132,6 +136,11 @@ public:
 
     TrainCrossing* AddCrossing(Vec3f position, u32 waypointMin, u32 waypointMax, f32 approachRadius, f32 exitRadius);
     std::vector<std::shared_ptr<TrainCrossing>> Crossings;
+
+    // MK64 Online FASE 1.4b: the oracle's `world` group — everything here outside Actors / Objects (those are the
+    // `actors` and `oobjects` groups), the Sky, the class statics, and the C globals subclass members point at.
+    // World.cpp.
+    void HashState(oracle::Hasher& h) const;
 private:
     std::unique_ptr<RaceManager> RaceManagerInstance;
 };

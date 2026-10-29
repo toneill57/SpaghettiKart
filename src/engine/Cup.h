@@ -6,6 +6,10 @@
 #include "tracks/Track.h"
 #include "registry/Registry.h"
 
+namespace oracle { // MK64 Online FASE 1.4b
+class Hasher;
+}
+
 class Track; // <-- Forward declare
 
 class Cup {
@@ -28,4 +32,7 @@ public:
     virtual void SetTrack(size_t position);
     virtual std::string GetTrack();
     virtual size_t GetSize();
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const;
 };

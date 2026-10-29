@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include "Penguin.h"
 #include <vector>
@@ -523,4 +524,17 @@ void OPenguin::DrawEditorProperties() {
     if (ImGui::Button(ICON_FA_UNDO "##ResetSpeed")) {
         Speed = 0.0f;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OPenguin::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "Type", Type);
+    put(h, "SpawnBhv", SpawnBhv);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OPenguin::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_toggle", _toggle);
 }

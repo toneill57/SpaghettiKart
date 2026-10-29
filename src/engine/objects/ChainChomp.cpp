@@ -1,4 +1,5 @@
 #include "ChainChomp.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "engine/World.h"
 #include "port/interpolation/FrameInterpolation.h"
 
@@ -136,4 +137,17 @@ void OChainChomp::func_800859C8(s32 objectIndex, s32 arg1) {
         func_800C98B8(object->pos, object->velocity, SOUND_ARG_LOAD(0x19, 0x01, 0x80, 0x57));
     }
     func_80074344(objectIndex, &object->surfaceHeight, -0.8f, 0.8f, 0.03f, 0, -1);
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OChainChomp::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_pos", _pos);
+    put(h, "_idx", (uint64_t) _idx);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OChainChomp::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

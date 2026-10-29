@@ -86,4 +86,8 @@ private:
     static size_t _count; // Total number of spawned trains
 //                  pathIndex, array of spawn points
     static std::map<uint32_t, std::vector<uint32_t>> TrainCounts;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const override;
+    static void HashStatics(oracle::Hasher& h);
 };

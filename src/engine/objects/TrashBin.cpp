@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include "TrashBin.h"
 #include "engine/World.h"
@@ -233,3 +234,14 @@ Vtx OTrashBin::BinVtx2[20] = {
 	{{ {-25, 20, 62}, 0, {0, 255}, {255, 255, 255, 0} }},
 	{{ {-19, -8, 52}, 0, {0, 1113}, {255, 255, 255, 0} }},
 };
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OTrashBin::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_bhv", _bhv);
+    put(h, "_pos", _pos);
+    put(h, "_rot", _rot);
+    put(h, "_scale", _scale);
+    put(h, "_idx", (uint64_t) _idx);
+    put(h, "_drawBin", _drawBin);
+}

@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include "Seagull.h"
 #include <vector>
@@ -200,4 +201,17 @@ void OSeagull::func_80082714(s32 objectIndex, s32 arg1) {
         default:
             break;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OSeagull::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_idx", _idx);
+    put(h, "_toggle", _toggle);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OSeagull::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 
 #include "Banana.h"
 #include "engine/Actor.h"
@@ -62,3 +63,9 @@ void ABanana::Collision(Player* player, AActor*) { }
 void ABanana::Destroy() { }
 
 //void ABanana::Held() {}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void ABanana::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "PlayerId", PlayerId);
+}

@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include "SkyStar.h"
 #include <vector>
@@ -162,4 +163,21 @@ bool SkyStar::star_func_80073B78(s32 arg0, s32 arg3, s32 arg4, s32 arg5, s32 arg
     }
 
     return phi_t0;
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void SkyStar::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    SkyActor::HashState(h);
+    put(h, "_idx", (uint64_t) _idx);
+    put(h, "mPrimAlpha", mPrimAlpha);
+    put(h, "mUnk_0CF", mUnk_0CF);
+    put(h, "mUnk_0AC", mUnk_0AC);
+    put(h, "mUnk_0D0", mUnk_0D0);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void SkyStar::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

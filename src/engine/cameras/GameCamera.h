@@ -7,6 +7,10 @@ extern "C" {
 #include "camera.h"
 }
 
+namespace oracle { // MK64 Online FASE 1.4b
+class Hasher;
+}
+
 class GameCamera {
 public:
     GameCamera();
@@ -39,4 +43,8 @@ protected:
     bool bActive;
     Camera* _camera;
     static size_t _count;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    virtual void HashState(oracle::Hasher& h) const;
+    static void HashStatics(oracle::Hasher& h);
 };

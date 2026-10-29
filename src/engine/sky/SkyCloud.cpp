@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include "SkyCloud.h"
 #include <vector>
@@ -111,4 +112,17 @@ void SkyCloud::Draw(ScreenContext* screen, s32 arg0) { // render_clouds
     }
     mOldX = mX;
     mOldY = posY;
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void SkyCloud::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    SkyActor::HashState(h);
+    put(h, "_idx", (uint64_t) _idx);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void SkyCloud::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

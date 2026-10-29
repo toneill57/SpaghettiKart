@@ -3,6 +3,10 @@
 #include <libultraship/libultraship.h>
 #include <utility>
 
+namespace oracle { // MK64 Online FASE 1.4b
+class Hasher;
+}
+
 /**
  * Uses weighted random picking
  * 
@@ -30,4 +34,7 @@ protected:
     // Rank         index        item_id,   chance
     std::vector<std::vector<ItemEntry>> mTable;
     std::unordered_set<uint32_t> mBlacklist;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const;
 };

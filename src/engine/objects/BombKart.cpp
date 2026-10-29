@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "engine/objects/Object.h"
 #include "BombKart.h"
 #include <vector>
@@ -640,4 +641,32 @@ void OBombKart::DrawEditorProperties() {
     if (ImGui::Button(ICON_FA_UNDO "##ResetSpeed")) {
         SpeedB = 2.7f;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OBombKart::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "Pos", Pos);
+    put(h, "WheelPos", WheelPos);
+    put(h, "Unk_3C", Unk_3C);
+    put(h, "SomeRot", SomeRot);
+    put(h, "WaypointIndex", WaypointIndex);
+    put(h, "State", State);
+    put(h, "BounceTimer", BounceTimer);
+    put(h, "CircleTimer", CircleTimer);
+    put(h, "Unk_4A", Unk_4A);
+    put(h, "Unk_4C", Unk_4C);
+    put(h, "CenterY", CenterY);
+    put(h, "_Collision", _Collision);
+    put(h, "Behaviour", Behaviour);
+    put(h, "SpeedB", SpeedB);
+    put(h, "_idx", _idx);
+    oracle::PutPlayerPtr(h, "_target", _target, "OBombKart::_target");
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OBombKart::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "vec", vec);
+    put(h, "_count", (uint64_t) _count);
 }

@@ -17,6 +17,9 @@ void add_triangle_to_collision_mesh(Vtx* vtx1, Vtx* vtx2, Vtx* vtx3, Vtx** outVt
 
 #ifdef __cplusplus
 class World;
+namespace oracle { // MK64 Online FASE 1.4b
+class Hasher;
+}
 
 /**
  * This may eventually become GameMode class
@@ -49,6 +52,9 @@ protected:
     RandomItemTable* mHumanItemTable;
     RandomItemTable* mCPUItemTable;
     std::unordered_map<std::string, RandomItemTable> mItemTables;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const;
 };
 
 #endif // __cplusplus

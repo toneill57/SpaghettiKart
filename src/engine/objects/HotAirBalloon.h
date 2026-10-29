@@ -31,4 +31,7 @@ public:
 private:
     FVector Pos;
     bool *_visible;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const override;
 };

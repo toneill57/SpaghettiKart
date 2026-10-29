@@ -37,4 +37,7 @@ public:
 private:
     static size_t _count;
     size_t _idx;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    static void HashStatics(oracle::Hasher& h);
 };

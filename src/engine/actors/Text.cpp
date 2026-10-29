@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include <vector>
 
@@ -600,4 +601,47 @@ void AText::DrawColourEditor(bool* updated) {
             }
         }
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void AText::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "Dist", Dist);
+    put(h, "PrevState", PrevState);
+    put(h, "FadeState", FadeState);
+    // CharacterList::vtx is NOT render-only: FadeIn / FadeOut read the alpha back and end the fade (FadeState) from it
+    // (Text.cpp:424-450), inside DrawText3D. Texture is an asset pointer (excluded).
+    {
+        oracle::Hasher::Scope s(h, "TextureList");
+        put(h, "size", (uint64_t) TextureList.size());
+        for (size_t i = 0; i < TextureList.size(); i++) {
+            oracle::Hasher::Scope e(h, i);
+            const CharacterList& c = TextureList[i];
+            put(h, "column", c.column);
+            put(h, "row", c.row);
+            put(h, "width", c.width);
+            put(h, "height", c.height);
+            put(h, "mode", c.mode);
+            put(h, "vtx", c.vtx);
+        }
+    }
+    put(h, "Text", Text);
+    put(h, "Mode", Mode);
+    put(h, "PlayerIndex", PlayerIndex);
+    put(h, "WidthOffset", WidthOffset);
+    put(h, "HeightOffset", HeightOffset);
+    put(h, "ScaleX", ScaleX);
+    put(h, "LetterSpacing", LetterSpacing);
+    put(h, "Far", Far);
+    put(h, "Close", Close);
+    put(h, "FaceCamera", FaceCamera);
+    put(h, "Animate", Animate);
+    put(h, "SingleColour", SingleColour);
+    put(h, "TextColour", TextColour);
+    put(h, "_idx", (uint64_t) _idx);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void AText::HashStatics(oracle::Hasher& h) {
+    oracle::put(h, "_count", (uint64_t) _count);
 }

@@ -4,15 +4,29 @@
 // the clang record-layout dump comparison). Never a whole struct as raw memory: padding, vptrs and pointers would make two
 // peers with identical simulation state hash differently.
 #include "OracleHash.h"
-#include "engine/CoreMath.h" // FVector (x,y,z), IRotator (pitch,yaw,roll), IPathSpan (Start,End)
+// FVector (x,y,z), IRotator (pitch,yaw,roll), IPathSpan (Start,End); FASE 1.4b: FVector2D, IVector2D, RGBA8
+#include "engine/CoreMath.h"
 
+#include <algorithm>
 #include <cstddef>
+#include <map>
+#include <optional>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 extern "C" {
 #include "common_structs.h"
 #include "objects.h"
 #include "camera.h"
+#include "vehicles.h"                 // TrainCarStuff (FASE 1.4b)
+#include "data/path_spawn_metadata.h" // TrackPathSizes (FASE 1.4b)
+#include "code_800029B0.h"             // ScreenContext (FASE 1.4b: SkyActor::mScreen)
 }
+
+class OObject;
+class ParticleEmitter;
 
 #define ORACLE_F(f) put(h, #f, s.f);
 #define ORACLE_STRUCT(Type, FIELDS)                                  \
@@ -70,6 +84,20 @@ extern "C" {
 #define ORACLE_FVECTOR_FIELDS(X) X(x) X(y) X(z)
 #define ORACLE_IROTATOR_FIELDS(X) X(pitch) X(yaw) X(roll)
 #define ORACLE_IPATHSPAN_FIELDS(X) X(Start) X(End)
+// FASE 1.4b — the POD member types of the classes in OracleCoverage.h. Each list is checked against the compiler's
+// record layout by implement/fase-1-artifacts/1.4b/inventory.py (the 1.4 field-coverage method). The parameter is F,
+// not X: IVector2D has a member named X.
+#define ORACLE_FVECTOR2D_FIELDS(F) F(x) F(z)
+#define ORACLE_IVECTOR2D_FIELDS(F) F(X) F(Y)
+#define ORACLE_RGBA8_FIELDS(F) F(r) F(g) F(b) F(a)
+#define ORACLE_RGB8_FIELDS(F) F(r) F(g) F(b) // include/common_structs.h
+// include/vehicles.h
+#define ORACLE_TRAINCARSTUFF_FIELDS(F) \
+    F(isActive) F(compilerPadding) F(position) F(velocity) F(waypointIndex) F(actorIndex) F(unused)
+// src/data/path_spawn_metadata.h
+#define ORACLE_TRACKPATHSIZES_FIELDS(F) F(unk0) F(unk2) F(unk4) F(unk6) F(unk8) F(padA)
+// libultraship gbi.h (Vtx = union { Vtx_t v; … })
+#define ORACLE_VTX_T_FIELDS(F) F(ob) F(flag) F(tc) F(cn)
 
 namespace oracle {
 
@@ -85,6 +113,83 @@ ORACLE_STRUCT(Player, ORACLE_PLAYER_FIELDS)
 ORACLE_STRUCT(struct Controller, ORACLE_CONTROLLER_FIELDS)
 ORACLE_STRUCT(UnkCameraInner, ORACLE_CAMERA_INNER_FIELDS)
 ORACLE_STRUCT(Camera, ORACLE_CAMERA_FIELDS)
+ORACLE_STRUCT(FVector2D, ORACLE_FVECTOR2D_FIELDS)
+ORACLE_STRUCT(IVector2D, ORACLE_IVECTOR2D_FIELDS)
+ORACLE_STRUCT(RGBA8, ORACLE_RGBA8_FIELDS)
+ORACLE_STRUCT(RGB8, ORACLE_RGB8_FIELDS)
+ORACLE_STRUCT(TrainCarStuff, ORACLE_TRAINCARSTUFF_FIELDS)
+ORACLE_STRUCT(TrackPathSizes, ORACLE_TRACKPATHSIZES_FIELDS)
+ORACLE_STRUCT(Vtx_t, ORACLE_VTX_T_FIELDS)
+
+// The colour view: every Vtx this hash reaches is built as Vtx_t.
+inline void put(Hasher& h, const char* n, const Vtx& s) {
+    put(h, n, s.v);
+}
+
+// Standard containers (FASE 1.4b rules, OracleCoverage.h): a size, then the elements by index; ordered containers by
+// key; unordered ones SORTED first (their iteration order is not state, T4 C09). Strings: size, then the bytes.
+inline void put(Hasher& h, const char* n, const std::string& s) {
+    Hasher::Scope sc(h, n);
+    put(h, "size", (uint64_t) s.size());
+    h.bytes(s.data(), s.size());
+}
+
+template <typename T> void put(Hasher& h, const char* n, const std::vector<T>& v) {
+    Hasher::Scope sc(h, n);
+    put(h, "size", (uint64_t) v.size());
+    for (size_t i = 0; i < v.size(); i++) {
+        Hasher::Scope e(h, i);
+        put(h, "", v[i]);
+    }
+}
+
+template <typename T> void put(Hasher& h, const char* n, const std::optional<T>& o) {
+    Hasher::Scope sc(h, n);
+    put(h, "has_value", o.has_value());
+    if (o.has_value()) {
+        put(h, "value", *o);
+    }
+}
+
+template <typename K, typename V> void put(Hasher& h, const char* n, const std::map<K, V>& m) {
+    Hasher::Scope sc(h, n);
+    put(h, "size", (uint64_t) m.size());
+    size_t i = 0;
+    for (const auto& kv : m) { // std::map iterates in key order
+        Hasher::Scope e(h, i++);
+        put(h, "key", kv.first);
+        put(h, "value", kv.second);
+    }
+}
+
+template <typename K, typename V> void put(Hasher& h, const char* n, const std::unordered_map<K, V>& m) {
+    std::vector<const std::pair<const K, V>*> sorted;
+    for (const auto& kv : m) {
+        sorted.push_back(&kv);
+    }
+    std::sort(sorted.begin(), sorted.end(), [](auto* a, auto* b) { return a->first < b->first; });
+    Hasher::Scope sc(h, n);
+    put(h, "size", (uint64_t) sorted.size());
+    for (size_t i = 0; i < sorted.size(); i++) {
+        Hasher::Scope e(h, i);
+        put(h, "key", sorted[i]->first);
+        put(h, "value", sorted[i]->second);
+    }
+}
+
+template <typename T> void put(Hasher& h, const char* n, const std::unordered_set<T>& s) {
+    std::vector<T> sorted(s.begin(), s.end());
+    std::sort(sorted.begin(), sorted.end());
+    put(h, n, sorted);
+}
+
+// Pointers are hashed as WHAT they name, never as an address (OracleCoverage.h rules). Defined in OracleStateHash.cpp.
+// `what` names the class and member for the Oracle_Abort message.
+void PutPlayerPtr(Hasher& h, const char* n, const Player* p, const char* what);          // index in gPlayers, -1 null
+void PutCameraPtr(Hasher& h, const char* n, const Camera* c, const char* what);          // index in cameras[], -1 null
+void PutScreenPtr(Hasher& h, const char* n, const ScreenContext* s, const char* what);   // gScreenContexts[], -1 null
+void PutObjectPtr(Hasher& h, const char* n, const OObject* o);                            // _objectIndex, -2 null
+void PutEmitterPtr(Hasher& h, const char* n, const ParticleEmitter* e, const char* what); // World::Emitters, -1 null
 
 inline void put(Hasher& h, const char* n, const Object& s) {
     Hasher::Scope sc(h, n);
@@ -105,3 +210,6 @@ static_assert(sizeof(Object) - offsetof(Object, unk_0DF) <= alignof(Object),
               "Object gained a trailing field: extend ORACLE_OBJECT_FIELDS");
 static_assert(sizeof(Camera) - offsetof(Camera, lookAtMatrix) == sizeof(void*),
               "Camera gained a field after lookAtMatrix: extend ORACLE_CAMERA_FIELDS");
+static_assert(sizeof(TrainCarStuff) == 0x24 && offsetof(TrainCarStuff, unused) == 0x20,
+              "TrainCarStuff changed: re-check ORACLE_TRAINCARSTUFF_FIELDS against the record layout");
+static_assert(sizeof(TrackPathSizes) == 0x10, "TrackPathSizes changed: re-check ORACLE_TRACKPATHSIZES_FIELDS");

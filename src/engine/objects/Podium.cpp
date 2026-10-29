@@ -1,4 +1,5 @@
 #include "Podium.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "assets/models/ceremony_data.h"
 
 extern "C" {
@@ -161,4 +162,13 @@ void OPodium::func_80086528(s32 objectIndex, s32 arg1) {
             }
             break;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OPodium::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_podium1Index", _podium1Index);
+    put(h, "_podium2Index", _podium2Index);
+    put(h, "_podium3Index", _podium3Index);
+    put(h, "_pos", _pos);
 }

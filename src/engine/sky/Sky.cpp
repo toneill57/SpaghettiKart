@@ -1,4 +1,5 @@
 #include "Sky.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 
 #include <libultraship.h>
 #include <libultra/gbi.h>
@@ -349,5 +350,39 @@ EXTERN_C void DrawSkyActors(ScreenContext* screen, s32 arg0) {
 EXTERN_C void TickSkyActors() {
     for (auto& cloud : Sky::Instance->GetSkyActors()) {
         cloud->Tick();
+    }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void SkyActor::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    oracle::PutScreenPtr(h, "mScreen", mScreen, "SkyActor::mScreen");
+    put(h, "mScale", mScale);
+    put(h, "mCloudVariant", mCloudVariant);
+    put(h, "mTextureWidth", mTextureWidth);
+    put(h, "mTextureHeight", mTextureHeight);
+    put(h, "mVisible", mVisible);
+    put(h, "mX", mX);
+    put(h, "mY", mY);
+    put(h, "mRotY", mRotY);
+    put(h, "mOldX", mOldX);
+    put(h, "mOldY", mOldY);
+    put(h, "mUnk208", mUnk208);
+    put(h, "mUnk210", mUnk210);
+    put(h, "mUnk1E8", mUnk1E8);
+    put(h, "mUnk218", mUnk218);
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void Sky::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    oracle::Hasher::Scope s(h, "mSkyActors");
+    put(h, "size", (uint64_t) mSkyActors.size());
+    for (size_t i = 0; i < mSkyActors.size(); i++) {
+        oracle::Hasher::Scope e(h, i);
+        put(h, "present", mSkyActors[i] != nullptr);
+        if (mSkyActors[i] != nullptr) {
+            mSkyActors[i]->HashState(h);
+        }
     }
 }

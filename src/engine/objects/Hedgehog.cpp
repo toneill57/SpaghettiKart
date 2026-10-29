@@ -1,4 +1,5 @@
 #include "Hedgehog.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "engine/World.h"
 #include "port/Game.h"
 #include "port/interpolation/FrameInterpolation.h"
@@ -247,4 +248,17 @@ void OHedgehog::DrawEditorProperties() {
     if (ImGui::Button(ICON_FA_UNDO "##ResetPatrolLoc")) {
         PatrolEnd = FVector2D(0.0f, 0.0f);
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OHedgehog::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "PatrolEnd", PatrolEnd);
+    put(h, "_idx", (uint64_t) _idx);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OHedgehog::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

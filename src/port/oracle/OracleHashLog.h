@@ -4,8 +4,8 @@
 //   MK64HASH 1
 //   # build=… platform=… buildType=… compiler=… binaryHash=0x…
 //   # tickLogic=2 seed=0x… fpWord=0x… configHash=0x… modListHash=0x… gameArchiveHash=0x… portArchiveHash=0x…
-//   # groups=rng,race,players,controllers,objects,actors,oobjects,cameras,racearrays,all
-//   <iter> rng=<16 hex> … racearrays=<16 hex> all=<16 hex>        (one line per PADS record, <iter> from 0, +1 per line)
+//   # groups=rng,race,players,controllers,objects,actors,oobjects,cameras,racearrays,world,all   (`world`: FASE 1.4b)
+//   <iter> rng=<16 hex> … world=<16 hex> all=<16 hex>        (one line per PADS record, <iter> from 0, +1 per line)
 //   END <data lines>                                               (clean shutdown only; absent ⇒ truncated)
 #include "OracleHash.h"
 #include "OracleRecording.h"
@@ -56,7 +56,8 @@ inline std::string FormatHashLogHeader(const Header& h) {
     return out;
 }
 
-// One data line ending in '\n'. Returns its length, or -1 if `cap` is too small (callers pass 512; a line is < 320 bytes).
+// One data line ending in '\n'. Returns its length, or -1 if `cap` is too small (callers pass 512; a line is < 340
+// bytes).
 inline int FormatHashLine(char* out, size_t cap, uint32_t iter, const GroupHashes& g) {
     int n = std::snprintf(out, cap, "%u", (unsigned) iter);
     for (int i = 0; i < kGroupCount && n >= 0 && (size_t) n < cap; i++) {

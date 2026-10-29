@@ -54,4 +54,8 @@ private:
     size_t _numBalloons;
     size_t _numBalloons2;
     size_t _numBalloons3;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const override;
+    static void HashStatics(oracle::Hasher& h);
 };

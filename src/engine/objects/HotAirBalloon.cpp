@@ -1,4 +1,5 @@
 #include "HotAirBalloon.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "engine/World.h"
 #include "port/Game.h"
 #include "port/interpolation/FrameInterpolation.h"
@@ -187,5 +188,19 @@ void OHotAirBalloon::func_80085768(s32 objectIndex) {
         case 0:
         case 2:
             break;
+    }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OHotAirBalloon::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "Pos", Pos);
+    // flag-ptr: on Luigi Raceway the C global D_80165898; elsewhere the constructor points it at a LOCAL (`bool mod`),
+    // which is dead once the constructor returns (FINDING 1.4b-F2). That target is hashed as "other" and never
+    // dereferenced here: the hasher must not add a read of a dead stack slot.
+    const uint8_t target = _visible == (bool*) &D_80165898 ? 1 : (_visible == nullptr ? 0 : 2);
+    put(h, "_visible.target", target);
+    if (target == 1) {
+        put(h, "_visible", *_visible);
     }
 }

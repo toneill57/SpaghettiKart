@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include "Mole.h"
 #include "port/interpolation/FrameInterpolation.h"
@@ -404,4 +405,18 @@ void OMole::func_80054F04(s32 cameraId) {
         }
     }
     gSPTexture(gDisplayListHead++, 1, 1, 0, G_TX_RENDERTILE, G_OFF);
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OMole::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_moleIndex", _moleIndex);
+    put(h, "_idx", (uint64_t) _idx);
+    oracle::PutObjectPtr(h, "_group", _group);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OMole::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

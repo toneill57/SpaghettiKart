@@ -1,4 +1,6 @@
 #include "RaceManager.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
+#include "port/oracle/OracleState.h"    // MK64 Online FASE 1.4b: Oracle_Abort
 
 #include "AllActors.h"
 #include "World.h"
@@ -188,4 +190,34 @@ extern "C" int16_t RaceManager_GetRandomCPUItem(uint32_t rank) {
     }
 
     return table->Roll(rank);
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void RaceManager::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    // table-key: each active table by the name that registers it in gItemTableRegistry (the tables live there,
+    // measured: RaceManager.cpp SetItemTables `gItemTableRegistry.Get(…)`; mItemTables is dead), then its contents.
+    auto table = [&](const char* n, const RandomItemTable* t) {
+        oracle::Hasher::Scope s(h, n);
+        std::string key;
+        bool found = t == nullptr;
+        gItemTableRegistry.ForEach([&](const std::string& k, const RandomItemTable& v) {
+            if (&v == t) {
+                key = k;
+                found = true;
+            }
+        });
+        if (!found) {
+            const std::string why =
+                std::string("state hash: RaceManager::") + n + " points at no gItemTableRegistry entry";
+            Oracle_Abort(why.c_str());
+        }
+        put(h, "present", t != nullptr);
+        put(h, "key", key);
+        if (t != nullptr) {
+            t->HashState(h);
+        }
+    };
+    table("mHumanItemTable", mHumanItemTable);
+    table("mCPUItemTable", mCPUItemTable);
 }

@@ -1,5 +1,6 @@
 
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include "Train.h"
 #include <vector>
@@ -391,4 +392,31 @@ void ATrain::DrawEditorProperties() {
     if (ImGui::Button(ICON_FA_UNDO "##ResetSpeed")) {
         Speed = 0.0f;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void ATrain::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "Locomotive", Locomotive);
+    put(h, "Tender", Tender);
+    put(h, "PassengerCars", PassengerCars);
+    put(h, "PassengerCarsCount", (uint64_t) PassengerCarsCount);
+    put(h, "SpawnType", SpawnType);
+    put(h, "PathIndex", PathIndex);
+    put(h, "PathPoint", PathPoint);
+    put(h, "HasTender", HasTender);
+    put(h, "SomeFlags", SomeFlags);
+    put(h, "SomeMultiplier", SomeMultiplier);
+    put(h, "Index", (uint64_t) Index);
+    put(h, "SmokeParticles", SmokeParticles);
+    put(h, "NextParticlePtr", NextParticlePtr);
+    put(h, "AnotherSmokeTimer", AnotherSmokeTimer);
+    put(h, "SmokeTimer", SmokeTimer);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void ATrain::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
+    put(h, "TrainCounts", TrainCounts);
 }

@@ -1,4 +1,5 @@
 #include "StaticMeshActor.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <libultra/gbi.h>
 #include "Matrix.h"
 
@@ -28,4 +29,16 @@ void StaticMeshActor::Draw() {
 
 void StaticMeshActor::Destroy() {
     bPendingDestroy = true;
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void StaticMeshActor::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "Name", Name);
+    put(h, "ResourceName", ResourceName);
+    put(h, "Pos", Pos);
+    put(h, "Rot", Rot);
+    put(h, "Scale", Scale);
+    put(h, "Model", Model);
+    put(h, "bPendingDestroy", bPendingDestroy);
 }

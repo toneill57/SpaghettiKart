@@ -6,6 +6,10 @@ extern "C" {
 #include "common_structs.h"
 }
 
+namespace oracle { // MK64 Online FASE 1.4b
+class Hasher;
+}
+
 /**
  * @brief TrainCrossing class
  * @arg Vec3f position of the crossing
@@ -32,4 +36,7 @@ public:
     virtual void AICrossingBehaviour(s32 playerId);
     f32 Distance(Vec3f a, Vec3f b);
     f32 DynamicRadius(Vec3f trainPos, Vec3f trainVelocity, Vec3f crossingPos);
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    virtual void HashState(oracle::Hasher& h) const;
 };

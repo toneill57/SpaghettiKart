@@ -5,6 +5,10 @@
 #include "CoreMath.h"
 #include <nlohmann/json.hpp>
 
+namespace oracle { // MK64 Online FASE 1.4b
+class Hasher;
+}
+
 // todo: Make this class AStaticMeshActor : public AActor
 class StaticMeshActor {
 public:
@@ -59,4 +63,7 @@ public:
 
     virtual void Draw();
     virtual void Destroy();
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    virtual void HashState(oracle::Hasher& h) const;
 };

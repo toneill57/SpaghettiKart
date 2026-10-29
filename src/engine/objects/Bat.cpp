@@ -1,4 +1,5 @@
 #include "Bat.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "engine/World.h"
 #include "engine/CoreMath.h"
 #include "port/interpolation/FrameInterpolation.h"
@@ -275,4 +276,17 @@ void OBat::func_8007D794(s32 objectIndex) {
     } else {
         OBat::func_80089A04(objectIndex, 0.25f, 0.1f);
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void OBat::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "_pos", _pos);
+    put(h, "_idx", (uint64_t) _idx);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void OBat::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
 }

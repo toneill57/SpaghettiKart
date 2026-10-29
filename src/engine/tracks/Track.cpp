@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include <unordered_set>
 #include <string>
 #include <cstring>
@@ -574,4 +575,90 @@ void Track::DrawTransparency(ScreenContext* screen, uint16_t pathCounter, uint16
 }
 
 void Track::Destroy() {
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void Track::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "ResourceName", ResourceName);
+    {
+        // Properties, field by field; its pointers (AIBehaviour, AIDistance, PathTable, PathTable2, CloudTexture,
+        // Clouds, CloudList, Minimap.Texture) are assets (excluded).
+        oracle::Hasher::Scope s(h, "Props");
+        const Properties& p = Props;
+        put(h, "Name", p.Name);
+        put(h, "DebugName", p.DebugName);
+        put(h, "TrackLength", p.TrackLength);
+        put(h, "LakituTowType", p.LakituTowType);
+        {
+            oracle::Hasher::Scope m(h, "Minimap");
+            put(h, "Width", p.Minimap.Width);
+            put(h, "Height", p.Minimap.Height);
+            put(h, "Pos", p.Minimap.Pos);
+            put(h, "PlayerX", p.Minimap.PlayerX);
+            put(h, "PlayerY", p.Minimap.PlayerY);
+            put(h, "PlayerScaleFactor", p.Minimap.PlayerScaleFactor);
+            put(h, "FinishlineX", p.Minimap.FinishlineX);
+            put(h, "FinishlineY", p.Minimap.FinishlineY);
+            put(h, "Colour", p.Minimap.Colour);
+        }
+        put(h, "AIMaximumSeparation", p.AIMaximumSeparation);
+        put(h, "AIMinimumSeparation", p.AIMinimumSeparation);
+        put(h, "NearPersp", p.NearPersp);
+        put(h, "FarPersp", p.FarPersp);
+        put(h, "AISteeringSensitivity", p.AISteeringSensitivity);
+        put(h, "PathSizes", p.PathSizes);
+        put(h, "CurveTargetSpeed", p.CurveTargetSpeed);
+        put(h, "NormalTargetSpeed", p.NormalTargetSpeed);
+        put(h, "D_0D0096B8", p.D_0D0096B8);
+        put(h, "OffTrackTargetSpeed", p.OffTrackTargetSpeed);
+        {
+            oracle::Hasher::Scope k(h, "Skybox");
+            put(h, "TopRight", p.Skybox.TopRight);
+            put(h, "BottomRight", p.Skybox.BottomRight);
+            put(h, "BottomLeft", p.Skybox.BottomLeft);
+            put(h, "TopLeft", p.Skybox.TopLeft);
+            put(h, "FloorTopRight", p.Skybox.FloorTopRight);
+            put(h, "FloorBottomRight", p.Skybox.FloorBottomRight);
+            put(h, "FloorBottomLeft", p.Skybox.FloorBottomLeft);
+            put(h, "FloorTopLeft", p.Skybox.FloorTopLeft);
+        }
+        put(h, "Sequence", p.Sequence);
+        put(h, "WaterLevel", p.WaterLevel);
+    }
+    put(h, "mCloudType", mCloudType);
+    {
+        oracle::Hasher::Scope s(h, "WaterVolumes");
+        put(h, "size", (uint64_t) WaterVolumes.size());
+        for (size_t i = 0; i < WaterVolumes.size(); i++) {
+            oracle::Hasher::Scope e(h, i);
+            const WaterVolume& v = WaterVolumes[i];
+            put(h, "Height", v.Height);
+            put(h, "MinX", v.MinX);
+            put(h, "MaxX", v.MaxX);
+            put(h, "MinZ", v.MinZ);
+            put(h, "MaxZ", v.MaxZ);
+        }
+    }
+    put(h, "bSpawnFinishline", bSpawnFinishline);
+    put(h, "FinishlineSpawnPoint", FinishlineSpawnPoint);
+    put(h, "bTourEnabled", bTourEnabled);
+    {
+        oracle::Hasher::Scope s(h, "TourShots");
+        put(h, "size", (uint64_t) TourShots.size());
+        for (size_t i = 0; i < TourShots.size(); i++) {
+            oracle::Hasher::Scope e(h, i);
+            const TourCamera::CameraShot& shot = TourShots[i];
+            put(h, "Pos", shot.Pos);
+            put(h, "LookAt", shot.LookAt);
+            oracle::Hasher::Scope f(h, "Frames");
+            put(h, "size", (uint64_t) shot.Frames.size());
+            for (size_t k = 0; k < shot.Frames.size(); k++) {
+                oracle::Hasher::Scope fe(h, k);
+                put(h, "Pos", shot.Frames[k].Pos);
+                put(h, "LookAt", shot.Frames[k].LookAt);
+                put(h, "Duration", shot.Frames[k].Duration);
+            }
+        }
+    }
 }

@@ -18,6 +18,19 @@ extern "C" {
 }
 
 #include "engine/cameras/GameCamera.h"
+// MK64 Online FASE 1.4b: the oracle's `world` group (World::HashState) reaches every class with statics.
+#include "engine/AllActors.h"
+#include "engine/objects/MoleGroup.h"
+#include "engine/PlayerBombKart.h"
+#include "engine/sky/SkyCloud.h"
+#include "engine/sky/SkySnow.h"
+#include "engine/sky/SkyStar.h"
+#include "engine/TrackBrowser.h"
+#include "port/oracle/OracleStatePut.h"
+#include "port/oracle/OracleState.h"
+extern "C" {
+#include "code_80057C60.h" // D_80165898, D_801658CE, D_801658DC
+}
 
 World* World::Instance;
 std::unique_ptr<Track> mTrack;
@@ -287,4 +300,262 @@ void World::CleanActors(void) {
     Actors.clear();
     Lakitus.clear();
     Objects.clear();
+}
+
+// MK64 Online FASE 1.4b: the oracle's `world` group (OracleStateHash.cpp HashWorld). The order is fixed — it IS the
+// hash input order: track, cups, cameras, static meshes, emitters, battle bomb karts, train crossings, race manager,
+// sky, the track browser, the class statics (alphabetical), the C globals subclass members point at. Containers by
+// index (T4 C09). Every member's classification is src/port/oracle/OracleCoverage.h.
+void World::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    {
+        oracle::Hasher::Scope s(h, "mTrack");
+        put(h, "present", mTrack != nullptr);
+        if (mTrack != nullptr) {
+            mTrack->HashState(h);
+        }
+    }
+    put(h, "CupIndex", (uint64_t) CupIndex);
+    {
+        int32_t cup = -1; // cup-ptr: CurrentCup by its index in Cups
+        for (size_t i = 0; i < Cups.size(); i++) {
+            if (Cups[i] == CurrentCup) {
+                cup = (int32_t) i;
+            }
+        }
+        if (CurrentCup != nullptr && cup < 0) {
+            Oracle_Abort("state hash: World::CurrentCup is not in World::Cups");
+        }
+        put(h, "CurrentCup", cup);
+    }
+    {
+        oracle::Hasher::Scope s(h, "Cups");
+        put(h, "size", (uint64_t) Cups.size());
+        for (size_t i = 0; i < Cups.size(); i++) {
+            oracle::Hasher::Scope e(h, i);
+            put(h, "present", Cups[i] != nullptr);
+            if (Cups[i] != nullptr) {
+                Cups[i]->HashState(h);
+            }
+        }
+    }
+    {
+        oracle::Hasher::Scope s(h, "Cameras");
+        put(h, "size", (uint64_t) Cameras.size());
+        for (size_t i = 0; i < Cameras.size(); i++) {
+            oracle::Hasher::Scope e(h, i);
+            put(h, "present", Cameras[i] != nullptr);
+            if (Cameras[i] != nullptr) {
+                Cameras[i]->HashState(h);
+            }
+        }
+    }
+    {
+        oracle::Hasher::Scope s(h, "StaticMeshActors");
+        put(h, "size", (uint64_t) StaticMeshActors.size());
+        for (size_t i = 0; i < StaticMeshActors.size(); i++) {
+            oracle::Hasher::Scope e(h, i);
+            put(h, "present", StaticMeshActors[i] != nullptr);
+            if (StaticMeshActors[i] != nullptr) {
+                StaticMeshActors[i]->HashState(h);
+            }
+        }
+    }
+    {
+        oracle::Hasher::Scope s(h, "Emitters");
+        put(h, "size", (uint64_t) Emitters.size());
+        for (size_t i = 0; i < Emitters.size(); i++) {
+            oracle::Hasher::Scope e(h, i);
+            put(h, "present", Emitters[i] != nullptr);
+            if (Emitters[i] != nullptr) {
+                Emitters[i]->HashState(h);
+            }
+        }
+    }
+    {
+        oracle::Hasher::Scope s(h, "mPlayerBombKart");
+        for (size_t i = 0; i < 4; i++) {
+            oracle::Hasher::Scope e(h, i);
+            mPlayerBombKart[i].HashState(h);
+        }
+    }
+    {
+        oracle::Hasher::Scope s(h, "Crossings");
+        put(h, "size", (uint64_t) Crossings.size());
+        for (size_t i = 0; i < Crossings.size(); i++) {
+            oracle::Hasher::Scope e(h, i);
+            put(h, "present", Crossings[i] != nullptr);
+            if (Crossings[i] != nullptr) {
+                Crossings[i]->HashState(h);
+            }
+        }
+    }
+    {
+        oracle::Hasher::Scope s(h, "RaceManagerInstance");
+        put(h, "present", RaceManagerInstance != nullptr);
+        if (RaceManagerInstance != nullptr) {
+            RaceManagerInstance->HashState(h);
+        }
+    }
+    {
+        oracle::Hasher::Scope s(h, "Sky");
+        put(h, "present", Sky::Instance != nullptr);
+        if (Sky::Instance != nullptr) {
+            Sky::Instance->HashState(h);
+        }
+    }
+    {
+        oracle::Hasher::Scope s(h, "TrackBrowser");
+        put(h, "present", TrackBrowser::Instance != nullptr);
+        if (TrackBrowser::Instance != nullptr) {
+            TrackBrowser::Instance->HashState(h);
+        }
+    }
+    {
+        oracle::Hasher::Scope s(h, "statics");
+        {
+            oracle::Hasher::Scope c(h, "ABoat");
+            ABoat::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "ABowserStatue");
+            ABowserStatue::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "ABus");
+            ABus::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "ACar");
+            ACar::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "AFallingRock");
+            AFallingRock::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "AFinishline");
+            AFinishline::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "AMarioSign");
+            AMarioSign::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "ASpaghettiShip");
+            ASpaghettiShip::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "AStarship");
+            AStarship::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "ATankerTruck");
+            ATankerTruck::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "AText");
+            AText::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "ATrain");
+            ATrain::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "ATruck");
+            ATruck::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "AWarioSign");
+            AWarioSign::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "GameCamera");
+            GameCamera::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OBat");
+            OBat::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OBombKart");
+            OBombKart::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OBoos");
+            OBoos::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OChainChomp");
+            OChainChomp::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OCrab");
+            OCrab::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OFlagpole");
+            OFlagpole::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OGrandPrixBalloons");
+            OGrandPrixBalloons::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OHedgehog");
+            OHedgehog::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OLakitu");
+            OLakitu::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OMole");
+            OMole::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OMoleGroup");
+            OMoleGroup::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OPenguin");
+            OPenguin::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OSeagull");
+            OSeagull::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OSnowman");
+            OSnowman::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "OThwomp");
+            OThwomp::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "PlayerBombKart");
+            PlayerBombKart::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "SkyCloud");
+            SkyCloud::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "SkySnow");
+            SkySnow::HashStatics(h);
+        }
+        {
+            oracle::Hasher::Scope c(h, "SkyStar");
+            SkyStar::HashStatics(h);
+        }
+    }
+    {
+        // The C globals that subclass members point at or read directly (OTrophy, OHotAirBalloon). Every other mutable
+        // C global is the separate C-globals task (decision 2, 2026-10-26).
+        oracle::Hasher::Scope s(h, "cglobals");
+        put(h, "D_80165898", D_80165898);
+        put(h, "D_801658CE", D_801658CE);
+        put(h, "D_801658DC", D_801658DC);
+    }
 }

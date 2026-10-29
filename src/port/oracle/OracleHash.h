@@ -219,16 +219,31 @@ template <typename T, size_t N> void put(Hasher& h, const char* n, const T (&a)[
     }
 }
 
-enum Group : int { kRng, kRace, kPlayers, kControllers, kObjects, kActors, kOObjects, kCameras, kRaceArrays, kGroupCount };
-inline constexpr const char* kGroupNames[kGroupCount] = { "rng",     "race",   "players",  "controllers", "objects",
-                                                          "actors",  "oobjects", "cameras", "racearrays" };
+// FASE 1.4b added `world` (the World-level state outside the actor / object deques). The format stays MK64HASH 1:
+// nothing consumed the nine-group v1 before it (1.6 unbuilt, no baseline); the `# groups=` line names what a log
+// carries.
+enum Group : int {
+    kRng,
+    kRace,
+    kPlayers,
+    kControllers,
+    kObjects,
+    kActors,
+    kOObjects,
+    kCameras,
+    kRaceArrays,
+    kWorld,
+    kGroupCount
+};
+inline constexpr const char* kGroupNames[kGroupCount] = { "rng",     "race",     "players", "controllers", "objects",
+                                                          "actors",  "oobjects", "cameras", "racearrays",  "world" };
 
 struct GroupHashes {
     uint64_t g[kGroupCount];
     uint64_t all;
 };
 
-// `all` = FNV-1a-64 over the nine group values as little-endian u64, in group order.
+// `all` = FNV-1a-64 over the group values as little-endian u64, in group order.
 inline uint64_t Combine(const uint64_t (&g)[kGroupCount]) {
     Hasher h;
     for (uint64_t v : g) {

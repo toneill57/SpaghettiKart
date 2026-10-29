@@ -1,4 +1,5 @@
 #include <libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "Boat.h"
 #include <vector>
 #include "Utils.h"
@@ -272,4 +273,32 @@ void ABoat::DrawEditorProperties() {
     if (ImGui::Button(ICON_FA_UNDO "##ResetSpeed")) {
         Speed = 0.0f;
     }
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void ABoat::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "Index", (uint64_t) Index);
+    put(h, "IsActive", IsActive);
+    put(h, "Position", Position);
+    put(h, "Velocity", Velocity);
+    put(h, "WaypointIndex", WaypointIndex);
+    put(h, "ActorIndex", ActorIndex);
+    put(h, "Speed", Speed);
+    put(h, "RotY", RotY);
+    put(h, "SomeFlags", SomeFlags);
+    put(h, "SmokeParticles", SmokeParticles);
+    put(h, "NextParticlePtr", NextParticlePtr);
+    put(h, "AnotherSmokeTimer", AnotherSmokeTimer);
+    put(h, "SmokeTimer", SmokeTimer);
+    put(h, "SpawnType", SpawnType);
+    put(h, "PathIndex", PathIndex);
+    put(h, "PathPoint", PathPoint);
+}
+
+// MK64 Online FASE 1.4b: the class statics, hashed once per iteration by World::HashState (OracleCoverage.h).
+void ABoat::HashStatics(oracle::Hasher& h) {
+    using oracle::put;
+    put(h, "_count", (uint64_t) _count);
+    put(h, "BoatCounts", BoatCounts);
 }

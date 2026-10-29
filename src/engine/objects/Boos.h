@@ -87,4 +87,7 @@ private:
 
     bool _isActive = false;
     s32 _playerId = 0;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    static void HashStatics(oracle::Hasher& h);
 };

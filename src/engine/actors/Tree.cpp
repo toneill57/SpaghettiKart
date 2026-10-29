@@ -1,4 +1,5 @@
 #include "Tree.h"
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 
 #include <libultra/gbi.h>
 
@@ -66,3 +67,14 @@ void ATree::Draw(Camera* camera) {
 
 void ATree::Collision(Player* player, AActor*) { }
 void ATree::Destroy() { }
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void ATree::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    put(h, "DrawDistance", DrawDistance);
+    put(h, "MinDrawDistance", MinDrawDistance);
+    put(h, "Flags", Flags);
+    put(h, "State", State);
+    put(h, "BoundingBoxSize", BoundingBoxSize);
+    put(h, "Unk_08", Unk_08);
+}

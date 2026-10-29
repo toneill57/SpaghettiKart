@@ -221,12 +221,12 @@ void LogHashCost(uint32_t iteration, uint64_t micros) {
         total += b;
     }
     SPDLOG_WARN("oracle: hash cost iter={} us={} bytes total={} rng={} race={} players={}/{} controllers={}/{} "
-                "objects={}/{} actors={} oobjects={} cameras={}/{} racearrays={} (hashed/footprint)",
+                "objects={}/{} actors={} oobjects={} cameras={}/{} racearrays={} world={} (hashed/footprint)",
                 iteration, micros, total, c.bytes[oracle::kRng], c.bytes[oracle::kRace], c.bytes[oracle::kPlayers],
                 c.footprint[oracle::kPlayers], c.bytes[oracle::kControllers], c.footprint[oracle::kControllers],
                 c.bytes[oracle::kObjects], c.footprint[oracle::kObjects], c.bytes[oracle::kActors],
                 c.bytes[oracle::kOObjects], c.bytes[oracle::kCameras], c.footprint[oracle::kCameras],
-                c.bytes[oracle::kRaceArrays]);
+                c.bytes[oracle::kRaceArrays], c.bytes[oracle::kWorld]);
 }
 
 void LogShutdownSummaries() {

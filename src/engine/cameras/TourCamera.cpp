@@ -1,4 +1,5 @@
 #include <libultraship/libultraship.h>
+#include "port/oracle/OracleStatePut.h" // MK64 Online FASE 1.4b: oracle state hash
 #include "TourCamera.h"
 #include "port/Engine.h"
 #include "port/Game.h"
@@ -219,4 +220,18 @@ void TourCamera::Draw() {
     gDPSetCombineMode(gDisplayListHead++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
     gDPFillWideRectangle(gDisplayListHead++, OTRGetRectDimensionFromLeftEdge(0), 0, OTRGetGameRenderWidth(), 239);
     gDPPipeSync(gDisplayListHead++);
+}
+
+// MK64 Online FASE 1.4b: the oracle state hash, member by member (OracleCoverage.h).
+void TourCamera::HashState(oracle::Hasher& h) const {
+    using oracle::put;
+    GameCamera::HashState(h);
+    put(h, "Type", Type);
+    put(h, "ShotIndex", (uint64_t) ShotIndex);
+    put(h, "KeyFrameIndex", (uint64_t) KeyFrameIndex);
+    put(h, "KeyFrameProgress", KeyFrameProgress);
+    put(h, "bShotComplete", bShotComplete);
+    put(h, "bTourComplete", bTourComplete);
+    put(h, "bActivateAudio", bActivateAudio);
+    put(h, "Alpha", Alpha);
 }

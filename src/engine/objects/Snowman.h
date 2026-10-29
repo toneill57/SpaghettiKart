@@ -55,4 +55,8 @@ private:
     size_t _idx;
     s32 _headIndex;
     s32 _bodyIndex;
+  public:
+    // MK64 Online FASE 1.4b: the oracle state hash (src/port/oracle/OracleCoverage.h).
+    void HashState(oracle::Hasher& h) const override;
+    static void HashStatics(oracle::Hasher& h);
 };
